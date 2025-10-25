@@ -34,29 +34,36 @@ export async function saveChat(
   tags?: string[]
 ): Promise<SavedChat> {
   try {
+    const chatTitle = title || `Chat - ${new Date().toLocaleDateString()}`
+    const finalUserId = userId || "anonymous"
+
+    console.log("[Save Chat] Saving chat with", messages.length, "messages for user:", finalUserId)
+
     const response = await fetch("/api/chat/save", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        title: title || `Chat - ${new Date().toLocaleDateString()}`,
+        title: chatTitle,
         messages: messages.map((m) => ({
           id: m.id,
           role: m.role,
           content: m.content,
           emotion: m.emotion,
-          timestamp: m.timestamp.toISOString(),
+          timestamp: m.timestamp instanceof Date ? m.timestamp.toISOString() : m.timestamp,
         })),
-        userId: userId || "anonymous",
+        userId: finalUserId,
         tags: tags || [],
       }),
     })
 
     if (!response.ok) {
       const error = await response.json()
+      console.error("[Save Chat] API error:", error)
       throw new Error(error.error || "Failed to save chat")
     }
 
     const data = await response.json()
+    console.log("[Save Chat] Successfully saved chat:", data.chatId)
     return {
       id: data.chatId,
       title: data.title,
@@ -80,19 +87,26 @@ export async function getSavedChats(userId?: string): Promise<SavedChat[]> {
     const params = new URLSearchParams()
     if (userId) {
       params.append("userId", userId)
+    } else {
+      params.append("userId", "anonymous")
     }
 
-    const response = await fetch(`/api/chat/save?${params}`, {
+    const url = `/api/chat/save?${params.toString()}`
+    console.log("[Get Saved Chats] Fetching from:", url)
+
+    const response = await fetch(url, {
       method: "GET",
       headers: { "Content-Type": "application/json" },
     })
 
     if (!response.ok) {
       const error = await response.json()
+      console.error("[Get Saved Chats] API error:", error)
       throw new Error(error.error || "Failed to retrieve chats")
     }
 
     const data = await response.json()
+    console.log("[Get Saved Chats] Retrieved", data.chats?.length || 0, "chats")
     return data.chats || []
   } catch (error) {
     console.error("[Get Saved Chats] Error:", error)
@@ -115,19 +129,26 @@ export async function loadChat(
     params.append("chatId", chatId)
     if (userId) {
       params.append("userId", userId)
+    } else {
+      params.append("userId", "anonymous")
     }
 
-    const response = await fetch(`/api/chat/save?${params}`, {
+    const url = `/api/chat/save?${params.toString()}`
+    console.log("[Load Chat] Fetching chat:", chatId, "from:", url)
+
+    const response = await fetch(url, {
       method: "GET",
       headers: { "Content-Type": "application/json" },
     })
 
     if (!response.ok) {
       const error = await response.json()
+      console.error("[Load Chat] API error:", error)
       throw new Error(error.error || "Failed to load chat")
     }
 
     const data = await response.json()
+    console.log("[Load Chat] Successfully loaded chat:", chatId, "with", data.chat?.messages?.length || 0, "messages")
     return data.chat
   } catch (error) {
     console.error("[Load Chat] Error:", error)

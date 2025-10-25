@@ -100,11 +100,15 @@ export async function POST(req: NextRequest) {
   try {
     const body: SaveChatRequest = await req.json()
 
+    console.log("[Save Chat API] Received request with", body.messages?.length || 0, "messages for user:", body.userId)
+
     if (!body.messages || !Array.isArray(body.messages)) {
+      console.error("[Save Chat API] Invalid messages format")
       return NextResponse.json({ error: "Invalid messages format" }, { status: 400 })
     }
 
     if (body.messages.length === 0) {
+      console.error("[Save Chat API] Cannot save empty chat")
       return NextResponse.json({ error: "Cannot save empty chat" }, { status: 400 })
     }
 
@@ -113,6 +117,8 @@ export async function POST(req: NextRequest) {
     const title = body.title || `Chat - ${new Date().toLocaleDateString()}`
     const userId = body.userId || "anonymous"
 
+    console.log("[Save Chat API] Generated chatId:", chatId, "title:", title)
+
     // Extract intent/emotion tags from messages
     const autoTags = extractTags(body.messages)
     const allTags = [...new Set([...(body.tags || []), ...autoTags])]
@@ -120,7 +126,7 @@ export async function POST(req: NextRequest) {
     // Try to save to Vercel KV, fallback to file-based storage
     try {
       await saveConversation(chatId, userId, title, body.messages, allTags)
-      console.log("[Save Chat API] Saved to Vercel KV:", chatId)
+      console.log("[Save Chat API] Successfully saved to Vercel KV:", chatId)
     } catch (kvError) {
       console.warn("[Save Chat API] Vercel KV unavailable, using fallback storage:", kvError)
       // Fallback to file-based storage
@@ -134,7 +140,7 @@ export async function POST(req: NextRequest) {
         messageCount: body.messages.length,
       }
       await saveToFallback(chatId, userId, chat)
-      console.log("[Save Chat API] Saved to file-based fallback storage:", chatId)
+      console.log("[Save Chat API] Successfully saved to file-based fallback storage:", chatId)
     }
 
     // Update user stats in Redis
@@ -153,6 +159,7 @@ export async function POST(req: NextRequest) {
       // Don't fail the save if stats update fails
     }
 
+    console.log("[Save Chat API] Returning success response for chatId:", chatId)
     return NextResponse.json({
       success: true,
       chatId,
@@ -174,7 +181,8 @@ export async function GET(req: NextRequest) {
   try {
     const chatId = req.nextUrl.searchParams.get("chatId")
     const userId = req.nextUrl.searchParams.get("userId") || "anonymous"
-    // Fixed fallbackStorage reference error
+
+    console.log("[Get Chat API] Request - chatId:", chatId, "userId:", userId)
 
     // If chatId is provided, return specific chat
     if (chatId) {
@@ -183,6 +191,7 @@ export async function GET(req: NextRequest) {
       // Try Vercel KV first
       try {
         chat = await getConversation(chatId, userId)
+        console.log("[Get Chat API] Found chat in Vercel KV:", chatId)
       } catch (kvError) {
         console.warn("[Get Chat API] Vercel KV unavailable, checking fallback:", kvError)
         // Check fallback storage
@@ -211,6 +220,7 @@ export async function GET(req: NextRequest) {
       }
 
       if (!chat) {
+        console.warn("[Get Chat API] Chat not found:", chatId)
         return NextResponse.json({ error: "Chat not found" }, { status: 404 })
       }
 
@@ -226,7 +236,7 @@ export async function GET(req: NextRequest) {
         }
       }
 
-      console.log("[Get Chat API] Retrieved chat successfully:", chatId)
+      console.log("[Get Chat API] Retrieved chat successfully:", chatId, "with", chat.messages?.length || 0, "messages")
 
       return NextResponse.json({
         success: true,
@@ -241,6 +251,7 @@ export async function GET(req: NextRequest) {
     }
 
     // Otherwise, return list of chats for user
+    console.log("[Get Chats API] Fetching all chats for user:", userId)
     let chats: SavedChat[] = []
 
     // Try Vercel KV first
