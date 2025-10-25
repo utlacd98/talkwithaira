@@ -1,18 +1,12 @@
 /**
  * Redis Client Configuration for Vercel
- * Uses @upstash/redis for serverless compatibility
+ * Uses @vercel/kv for serverless compatibility
  */
 
-import { Redis } from "@upstash/redis"
+import { kv } from "@vercel/kv"
 
-if (!process.env.KV_REST_API_URL || !process.env.KV_REST_API_TOKEN) {
-  throw new Error("Missing KV_REST_API_URL or KV_REST_API_TOKEN environment variables")
-}
-
-export const redis = new Redis({
-  url: process.env.KV_REST_API_URL,
-  token: process.env.KV_REST_API_TOKEN,
-})
+// Export kv as redis for compatibility
+export const redis = kv
 
 /**
  * User Stats Interface
