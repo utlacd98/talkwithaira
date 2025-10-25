@@ -1,0 +1,355 @@
+import { type NextRequest, NextResponse } from "next/server"
+import { promises as fs } from "fs"
+import path from "path"
+import {
+  saveConversation,
+  getConversation,
+  getUserConversations,
+  deleteConversation,
+  type ChatMessage,
+  type SavedChat,
+} from "@/lib/vercel-kv"
+import { incrementConversations, addRecentConversation } from "@/lib/redis"
+import { encryptChatObject, decryptChatObject, isEncrypted } from "@/lib/encryption"
+
+interface SaveChatRequest {
+  title?: string
+  messages: ChatMessage[]
+  userId?: string
+  tags?: string[]
+}
+
+interface GetChatRequest {
+  chatId: string
+}
+
+// File-based fallback storage for when Vercel KV is unavailable
+const FALLBACK_STORAGE_DIR = path.join(process.cwd(), ".chats")
+
+async function ensureStorageDir() {
+  try {
+    await fs.mkdir(FALLBACK_STORAGE_DIR, { recursive: true })
+  } catch (error) {
+    console.error("[Storage] Error creating storage directory:", error)
+  }
+}
+
+async function saveToFallback(chatId: string, userId: string, chat: SavedChat) {
+  try {
+    await ensureStorageDir()
+    const userDir = path.join(FALLBACK_STORAGE_DIR, userId)
+    await fs.mkdir(userDir, { recursive: true })
+    const filePath = path.join(userDir, `${chatId}.json`)
+
+    // Encrypt chat before saving
+    const encryptedChat = encryptChatObject(chat as any)
+
+    await fs.writeFile(filePath, JSON.stringify(encryptedChat, null, 2))
+    console.log("[Storage] Saved encrypted chat to file:", filePath)
+  } catch (error) {
+    console.error("[Storage] Error saving chat:", error)
+  }
+}
+
+async function loadFromFallback(userId: string): Promise<SavedChat[]> {
+  try {
+    await ensureStorageDir()
+    const userDir = path.join(FALLBACK_STORAGE_DIR, userId)
+    const files = await fs.readdir(userDir).catch(() => [])
+    const chats: SavedChat[] = []
+
+    for (const file of files) {
+      if (file.endsWith(".json")) {
+        const filePath = path.join(userDir, file)
+        const content = await fs.readFile(filePath, "utf-8")
+        let chat = JSON.parse(content)
+
+        // Decrypt if encrypted
+        if (chat.encrypted && isEncrypted(chat.messages)) {
+          try {
+            chat = decryptChatObject(chat)
+            console.log("[Storage] Decrypted chat from file:", filePath)
+          } catch (decryptError) {
+            console.error("[Storage] Error decrypting chat:", decryptError)
+            continue // Skip corrupted chats
+          }
+        }
+
+        chats.push(chat as SavedChat)
+      }
+    }
+
+    return chats.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+  } catch (error) {
+    console.error("[Storage] Error loading chats:", error)
+    return []
+  }
+}
+
+async function deleteFromFallback(chatId: string, userId: string) {
+  try {
+    const filePath = path.join(FALLBACK_STORAGE_DIR, userId, `${chatId}.json`)
+    await fs.unlink(filePath)
+    console.log("[Storage] Deleted chat file:", filePath)
+  } catch (error) {
+    console.error("[Storage] Error deleting chat:", error)
+  }
+}
+
+export async function POST(req: NextRequest) {
+  try {
+    const body: SaveChatRequest = await req.json()
+
+    if (!body.messages || !Array.isArray(body.messages)) {
+      return NextResponse.json({ error: "Invalid messages format" }, { status: 400 })
+    }
+
+    if (body.messages.length === 0) {
+      return NextResponse.json({ error: "Cannot save empty chat" }, { status: 400 })
+    }
+
+    // Generate chat ID and title
+    const chatId = `chat_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+    const title = body.title || `Chat - ${new Date().toLocaleDateString()}`
+    const userId = body.userId || "anonymous"
+
+    // Extract intent/emotion tags from messages
+    const autoTags = extractTags(body.messages)
+    const allTags = [...new Set([...(body.tags || []), ...autoTags])]
+
+    // Try to save to Vercel KV, fallback to file-based storage
+    try {
+      await saveConversation(chatId, userId, title, body.messages, allTags)
+      console.log("[Save Chat API] Saved to Vercel KV:", chatId)
+    } catch (kvError) {
+      console.warn("[Save Chat API] Vercel KV unavailable, using fallback storage:", kvError)
+      // Fallback to file-based storage
+      const chat: SavedChat = {
+        id: chatId,
+        title,
+        messages: body.messages,
+        tags: allTags,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        messageCount: body.messages.length,
+      }
+      await saveToFallback(chatId, userId, chat)
+      console.log("[Save Chat API] Saved to file-based fallback storage:", chatId)
+    }
+
+    // Update user stats in Redis
+    try {
+      if (userId !== "anonymous") {
+        // Increment conversations count
+        await incrementConversations(userId)
+
+        // Add to recent conversations
+        const summary = title || `Chat with ${body.messages.length} messages`
+        await addRecentConversation(userId, summary)
+        console.log("[Save Chat API] Updated user stats for:", userId)
+      }
+    } catch (statsError) {
+      console.warn("[Save Chat API] Failed to update stats:", statsError)
+      // Don't fail the save if stats update fails
+    }
+
+    return NextResponse.json({
+      success: true,
+      chatId,
+      title,
+      messageCount: body.messages.length,
+      tags: allTags,
+      savedAt: new Date().toISOString(),
+    })
+  } catch (error) {
+    console.error("[Save Chat API] Error:", error)
+    return NextResponse.json(
+      { error: "Failed to save chat. Please try again." },
+      { status: 500 }
+    )
+  }
+}
+
+export async function GET(req: NextRequest) {
+  try {
+    const chatId = req.nextUrl.searchParams.get("chatId")
+    const userId = req.nextUrl.searchParams.get("userId") || "anonymous"
+    // Fixed fallbackStorage reference error
+
+    // If chatId is provided, return specific chat
+    if (chatId) {
+      let chat: SavedChat | null = null
+
+      // Try Vercel KV first
+      try {
+        chat = await getConversation(chatId, userId)
+      } catch (kvError) {
+        console.warn("[Get Chat API] Vercel KV unavailable, checking fallback:", kvError)
+        // Check fallback storage
+        try {
+          const userDir = path.join(FALLBACK_STORAGE_DIR, userId)
+          const filePath = path.join(userDir, `${chatId}.json`)
+          const content = await fs.readFile(filePath, "utf-8")
+          let fallbackChat = JSON.parse(content)
+
+          // Decrypt if encrypted
+          if (fallbackChat.encrypted && isEncrypted(fallbackChat.messages)) {
+            try {
+              fallbackChat = decryptChatObject(fallbackChat)
+              console.log("[Get Chat API] Decrypted chat from fallback:", chatId)
+            } catch (decryptError) {
+              console.error("[Get Chat API] Error decrypting fallback chat:", decryptError)
+              return NextResponse.json({ error: "Failed to decrypt chat" }, { status: 500 })
+            }
+          }
+
+          chat = fallbackChat as SavedChat
+          console.log("[Get Chat API] Retrieved chat from fallback storage:", chatId)
+        } catch (fallbackError) {
+          console.warn("[Get Chat API] Fallback storage also unavailable:", fallbackError)
+        }
+      }
+
+      if (!chat) {
+        return NextResponse.json({ error: "Chat not found" }, { status: 404 })
+      }
+
+      // Decrypt if encrypted (only needed for Vercel KV chats, fallback chats are already decrypted)
+      if ((chat as any).encrypted && isEncrypted((chat as any).messages)) {
+        try {
+          const decrypted = decryptChatObject(chat as any)
+          chat = decrypted as SavedChat
+          console.log("[Get Chat API] Decrypted chat from Vercel KV:", chatId)
+        } catch (decryptError) {
+          console.error("[Get Chat API] Error decrypting chat:", decryptError)
+          return NextResponse.json({ error: "Failed to decrypt chat" }, { status: 500 })
+        }
+      }
+
+      console.log("[Get Chat API] Retrieved chat successfully:", chatId)
+
+      return NextResponse.json({
+        success: true,
+        chat: {
+          id: chat.id,
+          title: chat.title,
+          messages: chat.messages,
+          tags: chat.tags,
+          createdAt: chat.createdAt,
+        },
+      })
+    }
+
+    // Otherwise, return list of chats for user
+    let chats: SavedChat[] = []
+
+    // Try Vercel KV first
+    try {
+      chats = await getUserConversations(userId)
+      console.log("[Get Chats API] Retrieved", chats.length, "chats from Vercel KV for user:", userId)
+    } catch (kvError) {
+      console.warn("[Get Chats API] Vercel KV unavailable, using file-based fallback:", kvError)
+      // Use file-based fallback storage
+      chats = await loadFromFallback(userId)
+      console.log("[Get Chats API] Retrieved", chats.length, "chats from file storage for user:", userId)
+    }
+
+    return NextResponse.json({
+      success: true,
+      chats: chats || [],
+      count: chats?.length || 0,
+    })
+  } catch (error) {
+    console.error("[Get Chats API] Error:", error)
+    return NextResponse.json(
+      { error: "Failed to retrieve chats. Please try again." },
+      { status: 500 }
+    )
+  }
+}
+
+export async function DELETE(req: NextRequest) {
+  try {
+    const chatId = req.nextUrl.searchParams.get("chatId")
+    const userId = req.nextUrl.searchParams.get("userId") || "anonymous"
+
+    if (!chatId) {
+      return NextResponse.json({ error: "Chat ID is required" }, { status: 400 })
+    }
+
+    // Try to delete from Vercel KV first
+    try {
+      await deleteConversation(chatId, userId)
+      console.log("[Delete Chat API] Deleted from Vercel KV:", chatId)
+    } catch (kvError) {
+      console.warn("[Delete Chat API] Vercel KV unavailable, using file-based fallback:", kvError)
+      // Delete from file-based fallback storage
+      await deleteFromFallback(chatId, userId)
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: "Chat deleted successfully",
+    })
+  } catch (error) {
+    console.error("[Delete Chat API] Error:", error)
+    return NextResponse.json(
+      { error: "Failed to delete chat. Please try again." },
+      { status: 500 }
+    )
+  }
+}
+
+// Helper function to extract tags from messages
+function extractTags(messages: ChatMessage[]): string[] {
+  const tags: Set<string> = new Set()
+
+  messages.forEach((msg) => {
+    const content = msg.content.toLowerCase()
+
+    // Emotion tags
+    if (content.includes("anxious") || content.includes("anxiety") || content.includes("worried")) {
+      tags.add("anxiety")
+    }
+    if (content.includes("sad") || content.includes("depression") || content.includes("depressed")) {
+      tags.add("depression")
+    }
+    if (content.includes("angry") || content.includes("anger") || content.includes("furious")) {
+      tags.add("anger")
+    }
+    if (content.includes("grief") || content.includes("loss") || content.includes("died")) {
+      tags.add("grief")
+    }
+    if (content.includes("panic") || content.includes("panic attack")) {
+      tags.add("panic")
+    }
+    if (content.includes("sleep") || content.includes("insomnia") || content.includes("tired")) {
+      tags.add("sleep")
+    }
+    if (content.includes("stress") || content.includes("stressed")) {
+      tags.add("stress")
+    }
+    if (content.includes("lonely") || content.includes("loneliness")) {
+      tags.add("loneliness")
+    }
+
+    // Coping tags
+    if (content.includes("breathing") || content.includes("breath")) {
+      tags.add("breathing_exercise")
+    }
+    if (content.includes("grounding") || content.includes("5-4-3-2-1")) {
+      tags.add("grounding")
+    }
+    if (content.includes("celebrate") || content.includes("happy") || content.includes("great")) {
+      tags.add("celebration")
+    }
+
+    // Emotion from emotion field
+    if (msg.emotion) {
+      tags.add(msg.emotion)
+    }
+  })
+
+  return Array.from(tags)
+}
+

@@ -1,0 +1,33 @@
+{
+  "id": "chat_1761335167886_xbxpl4o0y",
+  "title": "Chat - 24/10/2025",
+  "messages": [
+    {
+      "id": "welcome",
+      "role": "assistant",
+      "content": "Hello! I'm Aira, your AI companion. I'm here to listen, understand, and support you. How are you feeling today?",
+      "emotion": "empathetic",
+      "timestamp": "2025-10-24T19:44:58.304Z"
+    },
+    {
+      "id": "1761335108497",
+      "role": "user",
+      "content": "who are you",
+      "timestamp": "2025-10-24T19:45:08.497Z"
+    },
+    {
+      "id": "1761335131036",
+      "role": "assistant",
+      "content": "I'm Aira, an AI companion created by Andrew James. My purpose is to listen and help you find emotional clarity and calm. I'm here for you, ready to support you in whatever you're going through. What’s on your mind today?",
+      "emotion": "calm",
+      "timestamp": "2025-10-24T19:45:31.035Z"
+    }
+  ],
+  "tags": [
+    "empathetic",
+    "calm"
+  ],
+  "createdAt": "2025-10-24T19:47:15.550Z",
+  "updatedAt": "2025-10-24T19:47:15.550Z",
+  "messageCount": 3
+}
