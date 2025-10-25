@@ -9,8 +9,8 @@
 
 [[redirects]]
   from = "/*"
-  to = "/index.html"
-  status = 404
+  to = "/.netlify/functions/___netlify-handler"
+  status = 200
 
 [[headers]]
   for = "/*"
