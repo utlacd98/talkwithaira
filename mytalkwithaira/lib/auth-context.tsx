@@ -45,7 +45,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // Check if user is admin/owner (bypass payment)
     let role: "user" | "admin" | "owner" = "user"
-    let plan: "free" | "plus" | "premium" = "free"
+    let plan: "free" | "plus" | "premium" = "premium" // TEMPORARY: All users get premium access during testing
 
     // Admin accounts - bypass payment
     if (email === "owner@aira.ai" || email === "admin1@aira.ai" || email === "admin2@aira.ai") {
@@ -89,7 +89,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // Check if user is admin/owner (bypass payment)
     let role: "user" | "admin" | "owner" = "user"
-    let plan: "free" | "plus" | "premium" = "free"
+    let plan: "free" | "plus" | "premium" = "premium" // TEMPORARY: All users get premium access during testing
 
     // Admin accounts - bypass payment
     if (email === "owner@aira.ai" || email === "admin1@aira.ai" || email === "admin2@aira.ai") {
