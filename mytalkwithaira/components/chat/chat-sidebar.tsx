@@ -24,15 +24,18 @@ export const ChatSidebar = forwardRef<ChatSidebarHandle, ChatSidebarProps>(
     const [hoveredChatId, setHoveredChatId] = useState<string | null>(null)
 
     const loadChats = async () => {
-      if (!userId) return
+      const finalUserId = userId || "anonymous"
 
+      console.log("[Chat Sidebar] Loading chats for user:", finalUserId)
       setIsLoading(true)
       setError(null)
       try {
-        const savedChats = await getSavedChats(userId)
+        const savedChats = await getSavedChats(finalUserId)
+        console.log("[Chat Sidebar] Loaded", savedChats.length, "chats")
         setChats(savedChats)
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to load chats")
+        const errorMsg = err instanceof Error ? err.message : "Failed to load chats"
+        setError(errorMsg)
         console.error("[Chat Sidebar] Error loading chats:", err)
       } finally {
         setIsLoading(false)

@@ -16,7 +16,8 @@ export interface SavedChat {
   title: string
   messageCount: number
   tags: string[]
-  savedAt: string
+  savedAt?: string
+  createdAt?: string
 }
 
 /**
