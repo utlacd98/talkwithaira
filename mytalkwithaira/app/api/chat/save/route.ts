@@ -1,6 +1,4 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { promises as fs } from "fs"
-import path from "path"
 import {
   saveConversation,
   getConversation,
@@ -10,7 +8,6 @@ import {
   type SavedChat,
 } from "@/lib/vercel-kv"
 import { incrementConversations, addRecentConversation } from "@/lib/redis"
-import { encryptChatObject, decryptChatObject, isEncrypted } from "@/lib/encryption"
 import { isMockMode, generateMockSaveResponse, simulateNetworkDelay, getOrCreateMockSession } from "@/lib/mock-services"
 
 interface SaveChatRequest {
@@ -24,120 +21,58 @@ interface GetChatRequest {
   chatId: string
 }
 
-// In-memory fallback storage for when Vercel KV is unavailable
-// This persists across requests within the same deployment
+/**
+ * In-memory fallback storage for when Vercel KV is unavailable
+ * This persists across requests within the same deployment
+ */
 const IN_MEMORY_STORAGE: Map<string, SavedChat> = new Map()
 
-// File-based fallback storage for when Vercel KV is unavailable
-const FALLBACK_STORAGE_DIR = path.join(process.cwd(), ".chats")
-
-async function ensureStorageDir() {
-  try {
-    await fs.mkdir(FALLBACK_STORAGE_DIR, { recursive: true })
-  } catch (error) {
-    console.error("[Storage] Error creating storage directory:", error)
-  }
-}
-
+/**
+ * Save chat to in-memory fallback storage
+ */
 async function saveToFallback(chatId: string, userId: string, chat: SavedChat) {
   try {
-    // Save to in-memory storage first (always works)
     const key = `${userId}:${chatId}`
     IN_MEMORY_STORAGE.set(key, chat)
-    console.log("[Storage] Saved chat to in-memory storage:", key)
-
-    // Also try to save to file system as backup
-    try {
-      await ensureStorageDir()
-      const userDir = path.join(FALLBACK_STORAGE_DIR, userId)
-      await fs.mkdir(userDir, { recursive: true })
-      const filePath = path.join(userDir, `${chatId}.json`)
-
-      // Encrypt chat before saving
-      const encryptedChat = encryptChatObject(chat as any)
-
-      await fs.writeFile(filePath, JSON.stringify(encryptedChat, null, 2))
-      console.log("[Storage] Saved encrypted chat to file:", filePath)
-    } catch (fileError) {
-      console.warn("[Storage] File system backup failed (this is OK on Vercel):", fileError)
-    }
+    console.log("[Storage] Saved chat to in-memory fallback storage:", key)
   } catch (error) {
-    console.error("[Storage] Error saving chat:", error)
+    console.error("[Storage] Error saving to fallback:", error)
   }
 }
 
+/**
+ * Load chats from in-memory fallback storage
+ */
 async function loadFromFallback(userId: string): Promise<SavedChat[]> {
   try {
     const chats: SavedChat[] = []
 
-    // First, load from in-memory storage
     for (const [key, chat] of IN_MEMORY_STORAGE.entries()) {
       if (key.startsWith(`${userId}:`)) {
         chats.push(chat)
-        console.log("[Storage] Loaded chat from in-memory storage:", key)
+        console.log("[Storage] Loaded chat from in-memory fallback:", key)
       }
-    }
-
-    // Also try to load from file system as backup
-    try {
-      await ensureStorageDir()
-      const userDir = path.join(FALLBACK_STORAGE_DIR, userId)
-      const files = await fs.readdir(userDir).catch(() => [])
-
-      for (const file of files) {
-        if (file.endsWith(".json")) {
-          const filePath = path.join(userDir, file)
-          const content = await fs.readFile(filePath, "utf-8")
-          let chat = JSON.parse(content)
-
-          // Decrypt if encrypted
-          if (chat.encrypted && isEncrypted(chat.messages)) {
-            try {
-              chat = decryptChatObject(chat)
-              console.log("[Storage] Decrypted chat from file:", filePath)
-            } catch (decryptError) {
-              console.error("[Storage] Error decrypting chat:", decryptError)
-              continue // Skip corrupted chats
-            }
-          }
-
-          // Only add if not already in memory
-          if (!chats.find((c) => c.id === chat.id)) {
-            chats.push(chat as SavedChat)
-            console.log("[Storage] Loaded chat from file:", filePath)
-          }
-        }
-      }
-    } catch (fileError) {
-      console.warn("[Storage] File system backup unavailable (this is OK on Vercel):", fileError)
     }
 
     return chats.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
   } catch (error) {
-    console.error("[Storage] Error loading chats:", error)
+    console.error("[Storage] Error loading from fallback:", error)
     return []
   }
 }
 
+/**
+ * Delete chat from in-memory fallback storage
+ */
 async function deleteFromFallback(chatId: string, userId: string) {
   try {
-    // Delete from in-memory storage
     const key = `${userId}:${chatId}`
     if (IN_MEMORY_STORAGE.has(key)) {
       IN_MEMORY_STORAGE.delete(key)
-      console.log("[Storage] Deleted chat from in-memory storage:", key)
-    }
-
-    // Also try to delete from file system
-    try {
-      const filePath = path.join(FALLBACK_STORAGE_DIR, userId, `${chatId}.json`)
-      await fs.unlink(filePath)
-      console.log("[Storage] Deleted chat file:", filePath)
-    } catch (fileError) {
-      console.warn("[Storage] File system deletion failed (this is OK on Vercel):", fileError)
+      console.log("[Storage] Deleted chat from in-memory fallback:", key)
     }
   } catch (error) {
-    console.error("[Storage] Error deleting chat:", error)
+    console.error("[Storage] Error deleting from fallback:", error)
   }
 }
 

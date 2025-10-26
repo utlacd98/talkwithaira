@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react"
 import { useRouter } from "next/navigation"
+import { validateCredentials, registerNewUser } from "@/lib/auth-db"
 
 interface User {
   id: string
@@ -40,29 +41,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const login = async (email: string, password: string) => {
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 1000))
+    // Validate credentials against auth database
+    const authUser = validateCredentials(email, password)
 
-    // Check if user is admin/owner (bypass payment)
-    let role: "user" | "admin" | "owner" = "user"
-    let plan: "free" | "plus" | "premium" = "premium" // TEMPORARY: All users get premium access during testing
-
-    // Admin accounts - bypass payment
-    if (email === "owner@aira.ai" || email === "admin1@aira.ai" || email === "admin2@aira.ai") {
-      role = email === "owner@aira.ai" ? "owner" : "admin"
-      plan = "premium" // Admins get premium access
+    if (!authUser) {
+      throw new Error("Invalid email or password")
     }
 
-    const mockUser: User = {
+    // Create user session
+    const sessionUser: User = {
       id: Math.random().toString(36).substr(2, 9),
-      email,
-      name: email.split("@")[0],
-      plan,
-      role,
+      email: authUser.email,
+      name: authUser.name,
+      plan: authUser.plan,
+      role: authUser.role,
     }
 
-    localStorage.setItem("aira_user", JSON.stringify(mockUser))
-    setUser(mockUser)
+    localStorage.setItem("aira_user", JSON.stringify(sessionUser))
+    setUser(sessionUser)
 
     // Register user on server side
     try {
@@ -70,10 +66,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          email: mockUser.email,
-          userId: mockUser.id,
-          name: mockUser.name,
-          plan: mockUser.plan,
+          email: sessionUser.email,
+          userId: sessionUser.id,
+          name: sessionUser.name,
+          plan: sessionUser.plan,
         }),
       })
     } catch (err) {
@@ -84,29 +80,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const signup = async (email: string, password: string, name: string) => {
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 1000))
-
-    // Check if user is admin/owner (bypass payment)
-    let role: "user" | "admin" | "owner" = "user"
-    let plan: "free" | "plus" | "premium" = "premium" // TEMPORARY: All users get premium access during testing
-
-    // Admin accounts - bypass payment
-    if (email === "owner@aira.ai" || email === "admin1@aira.ai" || email === "admin2@aira.ai") {
-      role = email === "owner@aira.ai" ? "owner" : "admin"
-      plan = "premium" // Admins get premium access
+    // Validate password length
+    if (password.length < 8) {
+      throw new Error("Password must be at least 8 characters")
     }
 
-    const mockUser: User = {
+    // Register new user in auth database
+    const authUser = registerNewUser(email, password, name)
+
+    if (!authUser) {
+      throw new Error("Email already registered or invalid credentials")
+    }
+
+    // Create user session
+    const sessionUser: User = {
       id: Math.random().toString(36).substr(2, 9),
-      email,
-      name,
-      plan,
-      role,
+      email: authUser.email,
+      name: authUser.name,
+      plan: authUser.plan,
+      role: authUser.role,
     }
 
-    localStorage.setItem("aira_user", JSON.stringify(mockUser))
-    setUser(mockUser)
+    localStorage.setItem("aira_user", JSON.stringify(sessionUser))
+    setUser(sessionUser)
 
     // Register user on server side
     try {
@@ -114,10 +110,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          email: mockUser.email,
-          userId: mockUser.id,
-          name: mockUser.name,
-          plan: mockUser.plan,
+          email: sessionUser.email,
+          userId: sessionUser.id,
+          name: sessionUser.name,
+          plan: sessionUser.plan,
         }),
       })
     } catch (err) {
