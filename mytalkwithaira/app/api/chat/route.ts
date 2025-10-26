@@ -1,6 +1,12 @@
 import { type NextRequest, NextResponse } from "next/server"
 import OpenAI from "openai"
 import { AIRA_SYSTEM_PROMPT } from "@/lib/aira-system-prompt"
+import {
+  isMockMode,
+  generateMockAIResponse,
+  simulateNetworkDelay,
+  getOrCreateMockSession,
+} from "@/lib/mock-services"
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -8,10 +14,21 @@ const openai = new OpenAI({
 
 export async function POST(req: NextRequest) {
   try {
-    const { messages } = await req.json()
+    const { messages, userId } = await req.json()
 
     if (!messages || !Array.isArray(messages)) {
       return NextResponse.json({ error: "Invalid messages format" }, { status: 400 })
+    }
+
+    // Mock mode: return simulated response
+    if (isMockMode()) {
+      await simulateNetworkDelay()
+      const mockResponse = generateMockAIResponse(userId || "mock-user")
+      if (userId) {
+        getOrCreateMockSession(userId)
+      }
+      console.log(`[Chat API] Mock response for user: ${userId || "mock-user"}`)
+      return NextResponse.json({ message: mockResponse.message, mock: true })
     }
 
     if (!process.env.OPENAI_API_KEY) {

@@ -3,10 +3,12 @@
  * Returns parsed Redis stats for authenticated user
  * Falls back to default stats if Redis is unavailable
  * Includes health checks and retry logic
+ * Supports mock mode for load testing
  */
 
 import { NextRequest, NextResponse } from "next/server"
 import { getUserStats, createUserStats, healthCheck, type UserStats } from "@/lib/redis"
+import { isMockMode, generateMockStats, simulateNetworkDelay, getOrCreateMockSession } from "@/lib/mock-services"
 
 export const runtime = "edge"
 
@@ -30,6 +32,23 @@ export async function GET(req: NextRequest) {
     }
 
     console.log("[Dashboard API] Fetching stats for user:", userId)
+
+    // Mock mode: return simulated stats
+    if (isMockMode()) {
+      await simulateNetworkDelay()
+      const mockStats = generateMockStats(userId)
+      getOrCreateMockSession(userId)
+      console.log(`[Dashboard API] Mock stats for user: ${userId}`)
+      return NextResponse.json(
+        {
+          success: true,
+          data: mockStats,
+          redisHealthy: true,
+          mock: true,
+        },
+        { status: 200 }
+      )
+    }
 
     // Check Redis health first
     let redisHealthy = false

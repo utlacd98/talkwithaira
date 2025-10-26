@@ -11,6 +11,7 @@ import {
 } from "@/lib/vercel-kv"
 import { incrementConversations, addRecentConversation } from "@/lib/redis"
 import { encryptChatObject, decryptChatObject, isEncrypted } from "@/lib/encryption"
+import { isMockMode, generateMockSaveResponse, simulateNetworkDelay, getOrCreateMockSession } from "@/lib/mock-services"
 
 interface SaveChatRequest {
   title?: string
@@ -154,6 +155,16 @@ export async function POST(req: NextRequest) {
     if (body.messages.length === 0) {
       console.error("[Save Chat API] Cannot save empty chat")
       return NextResponse.json({ error: "Cannot save empty chat" }, { status: 400 })
+    }
+
+    // Mock mode: return simulated save response
+    if (isMockMode()) {
+      await simulateNetworkDelay()
+      const userId = body.userId || "mock-user"
+      const mockResponse = generateMockSaveResponse(userId)
+      getOrCreateMockSession(userId)
+      console.log(`[Save Chat API] Mock save for user: ${userId}`)
+      return NextResponse.json(mockResponse, { status: 201 })
     }
 
     // Generate chat ID and title
