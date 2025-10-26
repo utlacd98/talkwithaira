@@ -3,7 +3,7 @@
 import { useAuth } from "@/lib/auth-context"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Sparkles, MessageSquare, TrendingUp, Heart, Settings, Crown, CheckCircle } from "lucide-react"
+import { Sparkles, MessageSquare, TrendingUp, Heart, Settings, Crown, CheckCircle, Gamepad2 } from "lucide-react"
 import Link from "next/link"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { useSearchParams } from "next/navigation"
@@ -133,7 +133,7 @@ export function DashboardContent() {
         </div>
 
         {/* Quick Actions */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           <Card className="glass-card">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -145,6 +145,21 @@ export function DashboardContent() {
             <CardContent>
               <Link href="/chat">
                 <Button className="w-full">Open Chat</Button>
+              </Link>
+            </CardContent>
+          </Card>
+
+          <Card className="glass-card">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Gamepad2 className="w-5 h-5 text-accent" />
+                Play with Aira
+              </CardTitle>
+              <CardDescription>Take a break with mini games</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Link href="/games">
+                <Button className="w-full">Play Now</Button>
               </Link>
             </CardContent>
           </Card>
