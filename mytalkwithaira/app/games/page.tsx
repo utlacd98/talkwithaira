@@ -4,15 +4,54 @@ import { ProtectedRoute } from "@/components/protected-route"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { TicTacToe } from "@/components/games/TicTacToe"
-import { ArrowLeft, Gamepad2, Zap, Heart, Brain } from "lucide-react"
+import { useAuth } from "@/lib/auth-context"
+import { ArrowLeft, Gamepad2, Zap, Heart, Brain, Trophy, Flame } from "lucide-react"
 import Link from "next/link"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { ThemeToggle } from "@/components/theme-toggle"
 
 type GameType = "tictactoe" | null
 
+interface UserStats {
+  wins: number
+  losses: number
+  draws: number
+  streak: number
+}
+
 export default function GamesPage() {
+  const { user } = useAuth()
   const [selectedGame, setSelectedGame] = useState<GameType>(null)
+  const [userStats, setUserStats] = useState<UserStats | null>(null)
+  const [loadingStats, setLoadingStats] = useState(true)
+
+  // Fetch user stats
+  useEffect(() => {
+    const fetchUserStats = async () => {
+      if (!user?.id) return
+
+      try {
+        setLoadingStats(true)
+        const response = await fetch(`/api/games/leaderboard?userId=${user.id}`)
+        const data = await response.json()
+
+        if (data.success && data.userStats) {
+          setUserStats({
+            wins: data.userStats.wins,
+            losses: data.userStats.losses,
+            draws: data.userStats.draws,
+            streak: data.userStats.streak,
+          })
+        }
+      } catch (error) {
+        console.error("[Games] Error fetching user stats:", error)
+      } finally {
+        setLoadingStats(false)
+      }
+    }
+
+    fetchUserStats()
+  }, [user?.id])
 
   const games = [
     {
@@ -103,6 +142,51 @@ export default function GamesPage() {
 
         {/* Main Content */}
         <main className="container mx-auto px-4 py-8 max-w-6xl">
+          {/* Navigation Tabs */}
+          <div className="flex gap-4 mb-8">
+            <Button className="gap-2 bg-primary hover:bg-primary/90">
+              <Gamepad2 className="w-4 h-4" />
+              Play Games
+            </Button>
+            <Link href="/games/leaderboard">
+              <Button variant="outline" className="gap-2">
+                <Trophy className="w-4 h-4" />
+                Leaderboard
+              </Button>
+            </Link>
+          </div>
+
+          {/* User Stats Summary */}
+          {userStats && !loadingStats && (
+            <Card className="glass-card mb-8 border-primary/20">
+              <CardContent className="pt-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className="text-3xl">📊</div>
+                    <div>
+                      <p className="text-sm text-muted-foreground mb-1">Your Record</p>
+                      <p className="text-lg font-semibold">
+                        {userStats.wins} Wins • {userStats.losses} Losses • {userStats.draws} Draws
+                        {userStats.streak > 0 && (
+                          <span className="ml-2 inline-flex items-center gap-1 text-orange-500">
+                            <Flame className="w-4 h-4" />
+                            Streak {userStats.streak}
+                          </span>
+                        )}
+                      </p>
+                    </div>
+                  </div>
+                  <Link href="/games/leaderboard">
+                    <Button variant="ghost" className="gap-2">
+                      <Trophy className="w-4 h-4" />
+                      View Rank
+                    </Button>
+                  </Link>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           {/* Welcome Section */}
           <div className="mb-8">
             <h2 className="text-3xl font-bold font-heading mb-2">Play with Aira</h2>

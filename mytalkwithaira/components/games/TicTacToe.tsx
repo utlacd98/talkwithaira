@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { getRandomReaction } from "@/lib/airaReactions"
+import { useAuth } from "@/lib/auth-context"
 import { RotateCcw, Volume2 } from "lucide-react"
 
 type BoardValue = "X" | "O" | null
@@ -16,6 +17,7 @@ interface GameStats {
 }
 
 export function TicTacToe() {
+  const { user } = useAuth()
   const [board, setBoard] = useState<BoardValue[]>(Array(9).fill(null))
   const [isXNext, setIsXNext] = useState(false) // O is human, X is AI
   const [gameStatus, setGameStatus] = useState<GameStatus>("playing")
@@ -23,6 +25,36 @@ export function TicTacToe() {
   const [airaMessage, setAiraMessage] = useState(getRandomReaction("start"))
   const [gameStarted, setGameStarted] = useState(false)
   const [moveCount, setMoveCount] = useState(0)
+  const [isSavingStats, setIsSavingStats] = useState(false)
+
+  // Save game stats to Redis
+  const saveGameStats = async (result: "win" | "loss" | "draw") => {
+    if (!user?.id || isSavingStats) return
+
+    try {
+      setIsSavingStats(true)
+      const response = await fetch("/api/games/save-stats", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: user.id,
+          game: "tictactoe",
+          result,
+          timestamp: new Date().toISOString(),
+        }),
+      })
+
+      if (!response.ok) {
+        console.error("[TicTacToe] Failed to save stats:", response.statusText)
+      } else {
+        console.log("[TicTacToe] Stats saved successfully for result:", result)
+      }
+    } catch (error) {
+      console.error("[TicTacToe] Error saving stats:", error)
+    } finally {
+      setIsSavingStats(false)
+    }
+  }
 
   // Calculate winner
   const calculateWinner = (squares: BoardValue[]): BoardValue => {
@@ -109,6 +141,7 @@ export function TicTacToe() {
       setGameStatus("won")
       setAiraMessage(getRandomReaction("win"))
       setStats((prev) => ({ ...prev, wins: prev.wins + 1 }))
+      saveGameStats("win")
       return
     }
 
@@ -116,6 +149,7 @@ export function TicTacToe() {
       setGameStatus("draw")
       setAiraMessage(getRandomReaction("draw"))
       setStats((prev) => ({ ...prev, draws: prev.draws + 1 }))
+      saveGameStats("draw")
       return
     }
 
@@ -138,6 +172,7 @@ export function TicTacToe() {
         setGameStatus("lost")
         setAiraMessage(getRandomReaction("lose"))
         setStats((prev) => ({ ...prev, losses: prev.losses + 1 }))
+        saveGameStats("loss")
         setIsXNext(false)
         return
       }
@@ -146,6 +181,7 @@ export function TicTacToe() {
         setGameStatus("draw")
         setAiraMessage(getRandomReaction("draw"))
         setStats((prev) => ({ ...prev, draws: prev.draws + 1 }))
+        saveGameStats("draw")
         setIsXNext(false)
         return
       }
