@@ -2,6 +2,7 @@
  * User Registry - Redis-based user profile storage
  * Maps email addresses to user IDs and stores user profiles
  * Replaces local .data/user-registry.json with Redis for Vercel compatibility
+ * Updated: 2025-10-27 - Removed all file-based operations
  */
 
 import { kv } from "@vercel/kv"
