@@ -16,11 +16,13 @@ export default function SignupPage() {
   const [password, setPassword] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState("")
+  const [success, setSuccess] = useState("")
   const { signup, signInWithGoogle } = useAuth()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError("")
+    setSuccess("")
     setIsLoading(true)
 
     if (password.length < 8) {
@@ -31,8 +33,15 @@ export default function SignupPage() {
 
     try {
       await signup(email, password, name)
-    } catch (err) {
-      setError("Failed to create account. Please try again.")
+    } catch (err: any) {
+      const errorMessage = err.message || "Failed to create account. Please try again."
+
+      // Check if it's an email confirmation message
+      if (errorMessage.includes("check your email") || errorMessage.includes("confirm your account")) {
+        setSuccess(errorMessage)
+      } else {
+        setError(errorMessage)
+      }
     } finally {
       setIsLoading(false)
     }
@@ -143,6 +152,14 @@ export default function SignupPage() {
               </div>
 
               {error && <p className="text-sm text-destructive">{error}</p>}
+              {success && (
+                <div className="p-4 bg-green-500/10 border border-green-500/20 rounded-lg">
+                  <p className="text-sm text-green-600 dark:text-green-400">{success}</p>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    After confirming, you can <Link href="/login" className="text-primary hover:underline">sign in here</Link>.
+                  </p>
+                </div>
+              )}
 
             <Button type="submit" className="w-full" disabled={isLoading}>
               {isLoading ? "Creating account..." : "Create Account"}

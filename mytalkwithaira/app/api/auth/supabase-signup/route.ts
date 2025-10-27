@@ -36,19 +36,27 @@ export async function POST(req: NextRequest) {
           plan: "free",
           role: "user",
         },
+        emailRedirectTo: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/auth/callback`,
       },
     })
 
     if (error) {
       console.log("[Supabase Signup] Signup failed:", error.message)
-      
-      if (error.message.includes("already registered")) {
+
+      if (error.message.includes("already registered") || error.message.includes("already been registered")) {
         return NextResponse.json(
           { error: "Email already registered" },
           { status: 409 }
         )
       }
-      
+
+      if (error.message.includes("invalid") && error.message.includes("email")) {
+        return NextResponse.json(
+          { error: "Please use a valid email address (e.g., yourname@gmail.com)" },
+          { status: 400 }
+        )
+      }
+
       return NextResponse.json(
         { error: error.message },
         { status: 400 }
@@ -57,12 +65,29 @@ export async function POST(req: NextRequest) {
 
     if (!data.user) {
       return NextResponse.json(
-        { error: "Registration failed" },
+        { error: "Registration failed - no user returned" },
         { status: 500 }
       )
     }
 
     console.log("[Supabase Signup] Signup successful for:", email)
+
+    // Check if email confirmation is required
+    if (data.user && !data.session) {
+      console.log("[Supabase Signup] Email confirmation required for:", email)
+      return NextResponse.json({
+        success: true,
+        requiresConfirmation: true,
+        message: "Please check your email to confirm your account",
+        user: {
+          id: data.user.id,
+          email: data.user.email,
+          name: data.user.user_metadata?.name || name,
+          plan: "free",
+          role: "user",
+        },
+      })
+    }
 
     // Return user data and session
     return NextResponse.json({

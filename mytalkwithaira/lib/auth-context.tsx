@@ -33,12 +33,67 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const router = useRouter()
 
   useEffect(() => {
-    // Check for stored user on mount
-    const storedUser = localStorage.getItem("aira_user")
-    if (storedUser) {
-      setUser(JSON.parse(storedUser))
+    const supabase = createClient()
+
+    // Check for active Supabase session and stored user on mount
+    const initializeAuth = async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+
+      if (session?.user) {
+        // User is authenticated via Supabase
+        console.log("[Auth Context] Found active Supabase session for:", session.user.email)
+
+        const sessionUser: User = {
+          id: session.user.id,
+          email: session.user.email || "",
+          name: session.user.user_metadata?.name || session.user.email?.split('@')[0] || "User",
+          plan: "free", // Default plan, will be updated from backend
+          role: "user",
+        }
+
+        // Store in localStorage for quick access
+        localStorage.setItem("aira_user", JSON.stringify(sessionUser))
+        localStorage.setItem("aira_session", JSON.stringify(session))
+        setUser(sessionUser)
+      } else {
+        // Check for stored user in localStorage
+        const storedUser = localStorage.getItem("aira_user")
+        if (storedUser) {
+          setUser(JSON.parse(storedUser))
+        }
+      }
+
+      setIsLoading(false)
     }
-    setIsLoading(false)
+
+    initializeAuth()
+
+    // Listen for auth state changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log("[Auth Context] Auth state changed:", event)
+
+      if (event === 'SIGNED_IN' && session?.user) {
+        const sessionUser: User = {
+          id: session.user.id,
+          email: session.user.email || "",
+          name: session.user.user_metadata?.name || session.user.email?.split('@')[0] || "User",
+          plan: "free",
+          role: "user",
+        }
+
+        localStorage.setItem("aira_user", JSON.stringify(sessionUser))
+        localStorage.setItem("aira_session", JSON.stringify(session))
+        setUser(sessionUser)
+      } else if (event === 'SIGNED_OUT') {
+        localStorage.removeItem("aira_user")
+        localStorage.removeItem("aira_session")
+        setUser(null)
+      }
+    })
+
+    return () => {
+      subscription.unsubscribe()
+    }
   }, [])
 
   const login = async (email: string, password: string) => {
@@ -94,6 +149,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     const data = await response.json()
+
+    // Check if email confirmation is required
+    if (data.requiresConfirmation) {
+      console.log("[Auth Context] Email confirmation required")
+      throw new Error("Please check your email to confirm your account before signing in")
+    }
+
     const sessionUser: User = data.user
 
     console.log("[Auth Context] Supabase signup successful for:", sessionUser.email)

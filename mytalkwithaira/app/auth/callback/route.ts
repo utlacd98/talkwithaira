@@ -1,19 +1,27 @@
-import { createClient } from '@/lib/supabase-client'
+import { createClient } from '@/lib/supabase-server'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
 export async function GET(request: NextRequest) {
   const requestUrl = new URL(request.url)
   const code = requestUrl.searchParams.get('code')
+  const error = requestUrl.searchParams.get('error')
+  const errorDescription = requestUrl.searchParams.get('error_description')
   const origin = requestUrl.origin
 
-  if (code) {
-    const supabase = createClient()
-    const { data, error } = await supabase.auth.exchangeCodeForSession(code)
+  // Check if there was an OAuth error from the provider
+  if (error) {
+    console.error('[OAuth Callback] OAuth provider error:', error, errorDescription)
+    return NextResponse.redirect(`${origin}/login?error=${error}`)
+  }
 
-    if (error) {
-      console.error('[OAuth Callback] Error exchanging code for session:', error)
-      return NextResponse.redirect(`${origin}/login?error=auth_failed`)
+  if (code) {
+    const supabase = await createClient()
+    const { data, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code)
+
+    if (exchangeError) {
+      console.error('[OAuth Callback] Error exchanging code for session:', exchangeError)
+      return NextResponse.redirect(`${origin}/login?error=auth_failed&details=${encodeURIComponent(exchangeError.message)}`)
     }
 
     if (data.user) {
