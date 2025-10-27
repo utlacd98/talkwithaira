@@ -5,7 +5,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server"
-import { getUserByEmail } from "@/lib/user-registry"
+import { getUserByEmail } from "@/lib/user-profile-registry"
 
 export async function GET(req: NextRequest) {
   try {

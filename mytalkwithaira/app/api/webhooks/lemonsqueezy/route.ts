@@ -4,7 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server"
-import { updateUserPlanByEmail } from "@/lib/user-registry"
+import { updateUserPlanByEmail } from "@/lib/user-profile-registry"
 import crypto from "crypto"
 
 // Map Lemonsqueezy product IDs to plan names
