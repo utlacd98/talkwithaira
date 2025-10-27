@@ -240,15 +240,15 @@
 
   /* Glass morphism with more depth */
   .glass-card {
-    background: rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.95);
     backdrop-filter: blur(20px) saturate(180%);
-    border: 1px solid rgba(255, 255, 255, 0.15);
+    border: 1px solid rgba(255, 255, 255, 0.3);
   }
 
   .dark .glass-card {
-    background: rgba(20, 20, 30, 0.6);
+    background: rgba(20, 20, 30, 0.95);
     backdrop-filter: blur(20px) saturate(180%);
-    border: 1px solid rgba(157, 78, 221, 0.2);
+    border: 1px solid rgba(157, 78, 221, 0.3);
   }
 
   /* Animated gradient text */
