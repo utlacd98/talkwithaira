@@ -40,10 +40,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const login = async (email: string, password: string) => {
-    console.log("[Auth Context] Attempting login for:", email)
+    console.log("[Auth Context] Attempting Supabase login for:", email)
 
-    // Call login API
-    const response = await fetch("/api/auth/login", {
+    // Call Supabase login API
+    const response = await fetch("/api/auth/supabase-login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, password }),
@@ -58,26 +58,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const data = await response.json()
     const sessionUser: User = data.user
 
-    console.log("[Auth Context] Login successful for:", sessionUser.email)
+    console.log("[Auth Context] Supabase login successful for:", sessionUser.email)
 
+    // Store user and session
     localStorage.setItem("aira_user", JSON.stringify(sessionUser))
-    setUser(sessionUser)
-
-    // Register user on server side
-    try {
-      await fetch("/api/auth/register-user", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email: sessionUser.email,
-          userId: sessionUser.id,
-          name: sessionUser.name,
-          plan: sessionUser.plan,
-        }),
-      })
-    } catch (err) {
-      console.warn("[Auth] Failed to register user on server:", err)
+    if (data.session) {
+      localStorage.setItem("aira_session", JSON.stringify(data.session))
     }
+    setUser(sessionUser)
 
     router.push("/dashboard")
   }
@@ -88,10 +76,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       throw new Error("Password must be at least 8 characters")
     }
 
-    console.log("[Auth Context] Attempting signup for:", email)
+    console.log("[Auth Context] Attempting Supabase signup for:", email)
 
-    // Call signup API
-    const response = await fetch("/api/auth/signup", {
+    // Call Supabase signup API
+    const response = await fetch("/api/auth/supabase-signup", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, password, name }),
@@ -106,32 +94,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const data = await response.json()
     const sessionUser: User = data.user
 
-    console.log("[Auth Context] Signup successful for:", sessionUser.email)
+    console.log("[Auth Context] Supabase signup successful for:", sessionUser.email)
 
+    // Store user and session
     localStorage.setItem("aira_user", JSON.stringify(sessionUser))
-    setUser(sessionUser)
-
-    // Register user on server side
-    try {
-      await fetch("/api/auth/register-user", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email: sessionUser.email,
-          userId: sessionUser.id,
-          name: sessionUser.name,
-          plan: sessionUser.plan,
-        }),
-      })
-    } catch (err) {
-      console.warn("[Auth] Failed to register user on server:", err)
+    if (data.session) {
+      localStorage.setItem("aira_session", JSON.stringify(data.session))
     }
+    setUser(sessionUser)
 
     router.push("/dashboard")
   }
 
   const logout = () => {
     localStorage.removeItem("aira_user")
+    localStorage.removeItem("aira_session")
     setUser(null)
     router.push("/")
   }
