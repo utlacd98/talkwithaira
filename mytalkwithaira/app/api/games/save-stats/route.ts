@@ -5,22 +5,11 @@
 
 import { type NextRequest, NextResponse } from "next/server"
 import { updateUserGameStats, saveUserProfile } from "@/lib/updateUserGameStats"
-import { getAuth } from "@clerk/nextjs/server"
 
 export const runtime = "edge"
 
 export async function POST(req: NextRequest) {
   try {
-    // Get auth info
-    const { userId: clerkUserId } = await getAuth(req)
-
-    if (!clerkUserId) {
-      return NextResponse.json(
-        { success: false, error: "Unauthorized" },
-        { status: 401 }
-      )
-    }
-
     // Parse request body
     const body = await req.json()
     const { userId, game, result, timestamp } = body
@@ -37,14 +26,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         { success: false, error: "Invalid result" },
         { status: 400 }
-      )
-    }
-
-    // Verify user is updating their own stats
-    if (userId !== clerkUserId) {
-      return NextResponse.json(
-        { success: false, error: "Cannot update other user's stats" },
-        { status: 403 }
       )
     }
 

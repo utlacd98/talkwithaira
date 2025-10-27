@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react"
 import { useRouter } from "next/navigation"
+import { createClient } from "@/lib/supabase-client"
 
 interface User {
   id: string
@@ -17,7 +18,8 @@ interface AuthContextType {
   user: User | null
   login: (email: string, password: string) => Promise<void>
   signup: (email: string, password: string, name: string) => Promise<void>
-  logout: () => void
+  signInWithGoogle: () => Promise<void>
+  logout: () => Promise<void>
   updateSubscription: (plan: "free" | "plus" | "premium") => void
   updateUserPlan: (plan: "free" | "plus" | "premium") => void
   isLoading: boolean
@@ -106,7 +108,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     router.push("/dashboard")
   }
 
-  const logout = () => {
+  const signInWithGoogle = async () => {
+    console.log("[Auth Context] Initiating Google Sign-In via Supabase")
+
+    const supabase = createClient()
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback`,
+        queryParams: {
+          access_type: 'offline',
+          prompt: 'consent',
+        },
+      },
+    })
+
+    if (error) {
+      console.error("[Auth Context] Google Sign-In error:", error)
+      throw new Error(error.message || "Google Sign-In failed")
+    }
+
+    console.log("[Auth Context] Google Sign-In initiated, redirecting...")
+  }
+
+  const logout = async () => {
+    const supabase = createClient()
+    await supabase.auth.signOut()
+
     localStorage.removeItem("aira_user")
     localStorage.removeItem("aira_session")
     setUser(null)
@@ -130,7 +158,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, login, signup, logout, updateSubscription, updateUserPlan, isLoading }}>
+    <AuthContext.Provider value={{ user, login, signup, signInWithGoogle, logout, updateSubscription, updateUserPlan, isLoading }}>
       {children}
     </AuthContext.Provider>
   )

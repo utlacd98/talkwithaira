@@ -9,11 +9,21 @@ import { NextRequest, NextResponse } from "next/server"
 import { registerUser } from "@/lib/redis-user-registry"
 import { isMockMode } from "@/lib/mock-services"
 
-export const runtime = "edge"
+// Temporarily disable edge runtime to allow better error handling
+// export const runtime = "edge"
 
 export async function POST(req: NextRequest) {
+  let email: string | undefined
+  let userId: string | undefined
+  let name: string | undefined
+  let plan: string | undefined
+
   try {
-    const { email, userId, name, plan } = await req.json()
+    const body = await req.json()
+    email = body.email
+    userId = body.userId
+    name = body.name
+    plan = body.plan
 
     if (!email || !userId) {
       console.warn("[Register User API] Missing required fields - email:", email, "userId:", userId)
@@ -58,14 +68,17 @@ export async function POST(req: NextRequest) {
     console.error("[Register User API] Error:", error instanceof Error ? error.message : error)
 
     // Even if registration fails, return success with fallback
-    const { userId } = await req.json().catch(() => ({}))
     if (userId) {
+      console.log("[Register User API] Returning fallback response for user:", userId)
       return NextResponse.json({
         success: true,
         message: "User registered (with fallback)",
         fallback: true,
         user: {
           id: userId,
+          email: email || "unknown",
+          name: name || "User",
+          plan: plan || "free",
           createdAt: Date.now(),
         },
       })
