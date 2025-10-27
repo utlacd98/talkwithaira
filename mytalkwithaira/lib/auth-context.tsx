@@ -2,7 +2,6 @@
 
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react"
 import { useRouter } from "next/navigation"
-import { validateCredentials, registerNewUser } from "@/lib/auth-db"
 
 interface User {
   id: string
@@ -41,21 +40,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const login = async (email: string, password: string) => {
-    // Validate credentials against auth database
-    const authUser = validateCredentials(email, password)
+    console.log("[Auth Context] Attempting login for:", email)
 
-    if (!authUser) {
-      throw new Error("Invalid email or password")
+    // Call login API
+    const response = await fetch("/api/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password }),
+    })
+
+    if (!response.ok) {
+      const error = await response.json()
+      console.error("[Auth Context] Login failed:", error.error)
+      throw new Error(error.error || "Invalid email or password")
     }
 
-    // Create user session
-    const sessionUser: User = {
-      id: Math.random().toString(36).substr(2, 9),
-      email: authUser.email,
-      name: authUser.name,
-      plan: authUser.plan,
-      role: authUser.role,
-    }
+    const data = await response.json()
+    const sessionUser: User = data.user
+
+    console.log("[Auth Context] Login successful for:", sessionUser.email)
 
     localStorage.setItem("aira_user", JSON.stringify(sessionUser))
     setUser(sessionUser)
@@ -85,21 +88,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       throw new Error("Password must be at least 8 characters")
     }
 
-    // Register new user in auth database
-    const authUser = registerNewUser(email, password, name)
+    console.log("[Auth Context] Attempting signup for:", email)
 
-    if (!authUser) {
-      throw new Error("Email already registered or invalid credentials")
+    // Call signup API
+    const response = await fetch("/api/auth/signup", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password, name }),
+    })
+
+    if (!response.ok) {
+      const error = await response.json()
+      console.error("[Auth Context] Signup failed:", error.error)
+      throw new Error(error.error || "Registration failed")
     }
 
-    // Create user session
-    const sessionUser: User = {
-      id: Math.random().toString(36).substr(2, 9),
-      email: authUser.email,
-      name: authUser.name,
-      plan: authUser.plan,
-      role: authUser.role,
-    }
+    const data = await response.json()
+    const sessionUser: User = data.user
+
+    console.log("[Auth Context] Signup successful for:", sessionUser.email)
 
     localStorage.setItem("aira_user", JSON.stringify(sessionUser))
     setUser(sessionUser)
