@@ -9,9 +9,12 @@
  */
 
 export interface AuthUser {
+  id?: string
   email: string
-  password: string
+  password?: string
   name: string
+  picture?: string
+  googleId?: string
   plan: "free" | "plus" | "premium"
   role: "user" | "admin" | "owner"
   createdAt: number
@@ -251,5 +254,62 @@ export function printTestCredentials(): void {
   console.log("  Email: demo@aira.ai")
   console.log("  Password: demo123")
   console.log("============================\n")
+}
+
+/**
+ * Find or create a user from Google OAuth
+ */
+export function findOrCreateGoogleUser(
+  googleId: string,
+  email: string,
+  name: string,
+  picture?: string
+): AuthUser | null {
+  const lowerEmail = email.toLowerCase()
+
+  // Check if user already exists by email
+  let user = USERS_DB[lowerEmail]
+
+  if (user) {
+    // Update existing user with Google ID if not already set
+    if (!user.googleId) {
+      user.googleId = googleId
+      user.picture = picture
+      console.log(`[Auth DB] Updated user with Google ID: ${email}`)
+    }
+    return user
+  }
+
+  // Create new user from Google
+  const newUser: AuthUser = {
+    id: Math.random().toString(36).substr(2, 9),
+    email: lowerEmail,
+    name,
+    picture,
+    googleId,
+    plan: "free",
+    role: "user",
+    createdAt: Date.now(),
+  }
+
+  USERS_DB[lowerEmail] = newUser
+  console.log(`[Auth DB] Created new user from Google: ${email}`)
+  return newUser
+}
+
+/**
+ * Update user's Google profile picture
+ */
+export function updateGoogleUser(email: string, picture: string): AuthUser | null {
+  const user = USERS_DB[email.toLowerCase()]
+
+  if (!user) {
+    console.log(`[Auth DB] User not found: ${email}`)
+    return null
+  }
+
+  user.picture = picture
+  console.log(`[Auth DB] Updated user picture: ${email}`)
+  return user
 }
 
