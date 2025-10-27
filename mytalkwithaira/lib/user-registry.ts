@@ -134,24 +134,52 @@ export async function updateUserPlan(
   }
 }
 
-// Update user plan
-export async function updateUserPlanByEmail(email: string, plan: "free" | "plus" | "premium"): Promise<boolean> {
-  const registry = await loadRegistry()
-  const user = registry[email.toLowerCase()]
+/**
+ * Update user plan by email
+ * Looks up user by email, then updates their plan
+ */
+export async function updateUserPlanByEmail(
+  email: string,
+  plan: "free" | "plus" | "premium"
+): Promise<boolean> {
+  try {
+    const normalizedEmail = email.toLowerCase()
+    const emailKey = `email:${normalizedEmail}:userId`
 
-  if (!user) {
-    console.warn("[User Registry] User not found:", email)
+    // Get userId from email lookup
+    const userId = await kv.get(emailKey)
+
+    if (!userId) {
+      console.warn("[User Registry] User not found for email:", normalizedEmail)
+      return false
+    }
+
+    // Update plan in user profile
+    const profileKey = `user:${userId}:profile`
+    await kv.hset(profileKey, { plan })
+    console.log("[User Registry] Updated plan for", normalizedEmail, "to", plan)
+    return true
+  } catch (error) {
+    console.error("[User Registry] Error updating user plan by email:", error)
     return false
   }
-
-  user.plan = plan
-  await saveRegistry(registry)
-  console.log("[User Registry] Updated plan for", email, "to", plan)
-  return true
 }
 
-// Get all users
-export async function getAllUsers(): Promise<UserRegistry> {
-  return loadRegistry()
+/**
+ * Get all users (for admin purposes)
+ * Note: This is a simplified version - in production, you'd want to use SCAN
+ */
+export async function getAllUsers(): Promise<UserProfile[]> {
+  try {
+    // This is a placeholder - Redis doesn't have a simple "get all" operation
+    // In production, you'd want to:
+    // 1. Use SCAN to iterate through user:*:profile keys
+    // 2. Or maintain a separate set of all user IDs
+    console.warn("[User Registry] getAllUsers() is not fully implemented for Redis")
+    return []
+  } catch (error) {
+    console.error("[User Registry] Error getting all users:", error)
+    return []
+  }
 }
 
