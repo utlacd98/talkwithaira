@@ -3,6 +3,7 @@
 import type React from "react"
 
 import { useState } from "react"
+// Force rebuild - Google OAuth enabled
 import { useAuth } from "@/lib/auth-context"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
