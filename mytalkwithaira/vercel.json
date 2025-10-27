@@ -1,9 +1,9 @@
 {
-  "buildCommand": "cd mytalkwithaira && npm run build",
-  "devCommand": "cd mytalkwithaira && npm run dev",
-  "installCommand": "cd mytalkwithaira && npm install",
+  "buildCommand": "npm run build",
+  "devCommand": "npm run dev",
+  "installCommand": "npm install",
   "framework": "nextjs",
-  "outputDirectory": "mytalkwithaira/.next",
+  "outputDirectory": ".next",
   "env": {
     "FORCE_REBUILD": "true"
   }
