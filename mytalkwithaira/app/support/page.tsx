@@ -90,18 +90,24 @@ export default function SupportPage() {
   }
 
   const filteredHelplines = helplines.filter((helpline) => {
-    const matchesSearch = helpline.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    // Filter by search query (only if user typed something)
+    const matchesSearch = !searchQuery.trim() ||
+                         helpline.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                          helpline.snippet.toLowerCase().includes(searchQuery.toLowerCase())
+
+    // Filter by topic
     const matchesTopic = selectedTopic === "All topics" || helpline.topics.includes(selectedTopic)
 
-    // Filter by location if specified
+    // Filter by location - always show nationwide helplines
     let matchesLocation = true
-    if (locationQuery.trim()) {
+    if (locationQuery.trim() && hasSearched) {
       const locationLower = locationQuery.toLowerCase()
       const locations = helpline.locations.lvl1.join(" ").toLowerCase()
-      matchesLocation = locations.includes(locationLower) ||
-                       locations.includes("_nationwide_") ||
-                       helpline.name.toLowerCase().includes(locationLower)
+
+      // Show if: nationwide OR matches location OR matches country
+      matchesLocation = locations.includes("_nationwide_") ||
+                       locations.includes(locationLower) ||
+                       locations.includes(selectedCountry.toLowerCase())
     }
 
     return matchesSearch && matchesTopic && matchesLocation

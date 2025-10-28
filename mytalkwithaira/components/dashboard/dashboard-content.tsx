@@ -9,12 +9,15 @@ import { ThemeToggle } from "@/components/theme-toggle"
 import { useSearchParams } from "next/navigation"
 import { useEffect, useState } from "react"
 import { useDashboardStats } from "@/lib/hooks/useDashboardStats"
+import { MoodTracker } from "@/components/dashboard/mood-tracker"
+import { Affirmations } from "@/components/dashboard/affirmations"
+import { MoodInsights } from "@/components/dashboard/mood-insights"
 
 export function DashboardContent() {
   const { user, logout, updateUserPlan } = useAuth()
   const searchParams = useSearchParams()
   const [showUpgradeSuccess, setShowUpgradeSuccess] = useState(false)
-  const { stats: dashboardStats, loading, error } = useDashboardStats(user?.id)
+  const { stats: dashboardStats, loading, error, refetch } = useDashboardStats(user?.id)
 
   useEffect(() => {
     const sessionId = searchParams.get("session_id")
@@ -131,6 +134,28 @@ export function DashboardContent() {
             </Card>
           ))}
         </div>
+
+        {/* Mood Tracker & Premium Features */}
+        {user?.id && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+            <MoodTracker
+              userId={user.id}
+              currentMoodScore={dashboardStats?.mood_score || 5}
+              onUpdate={refetch}
+            />
+            <Affirmations
+              userId={user.id}
+              moodScore={dashboardStats?.mood_score || 5}
+            />
+          </div>
+        )}
+
+        {/* Advanced Mood Insights */}
+        {user?.id && (
+          <div className="mb-8">
+            <MoodInsights userId={user.id} />
+          </div>
+        )}
 
         {/* Quick Actions */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">

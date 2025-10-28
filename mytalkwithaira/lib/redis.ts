@@ -63,6 +63,15 @@ export interface UserStats {
 }
 
 /**
+ * Mood Entry Interface
+ */
+export interface MoodEntry {
+  score: number
+  timestamp: string
+  note?: string
+}
+
+/**
  * Create initial stats for a new user
  */
 export async function createUserStats(userId: string): Promise<UserStats> {
@@ -289,3 +298,146 @@ export async function healthCheck(): Promise<boolean> {
   }
 }
 
+/**
+ * Add a mood entry to user's mood history
+ * Stores entries in a sorted set with timestamp as score
+ */
+export async function addMoodEntry(userId: string, score: number, note?: string): Promise<void> {
+  try {
+    if (score < 0 || score > 10) {
+      throw new Error("Mood score must be between 0 and 10")
+    }
+
+    const timestamp = new Date().toISOString()
+    const entry: MoodEntry = {
+      score,
+      timestamp,
+      note,
+    }
+
+    const key = `user:${userId}:mood_history`
+    const timestampScore = Date.now()
+
+    // Add to sorted set (sorted by timestamp)
+    await executeWithRetry(
+      () => redis.zadd(key, { score: timestampScore, member: JSON.stringify(entry) }),
+      `addMoodEntry(${userId})`
+    )
+
+    // Also update current mood score in stats
+    await updateMoodScore(userId, score)
+
+    console.log("[Redis] Added mood entry for user:", userId, "Score:", score)
+  } catch (error) {
+    console.error("[Redis] Error adding mood entry:", error)
+    throw error
+  }
+}
+
+/**
+ * Get mood history for a user
+ * Returns entries sorted by timestamp (newest first)
+ */
+export async function getMoodHistory(
+  userId: string,
+  limit: number = 30
+): Promise<MoodEntry[]> {
+  try {
+    const key = `user:${userId}:mood_history`
+
+    // Get entries from sorted set (newest first)
+    const entries = await executeWithRetry(
+      () => redis.zrange(key, -limit, -1, { rev: true }),
+      `getMoodHistory(${userId})`
+    )
+
+    if (!entries || entries.length === 0) {
+      return []
+    }
+
+    return entries.map((entry) => JSON.parse(entry as string) as MoodEntry)
+  } catch (error) {
+    console.error("[Redis] Error getting mood history:", error)
+    return []
+  }
+}
+
+/**
+ * Get mood statistics for a user
+ */
+export async function getMoodStats(userId: string, days: number = 30): Promise<{
+  average: number
+  highest: number
+  lowest: number
+  trend: "improving" | "declining" | "stable"
+  totalEntries: number
+}> {
+  try {
+    const entries = await getMoodHistory(userId, days * 2) // Get more entries to ensure we have enough
+
+    if (entries.length === 0) {
+      return {
+        average: 0,
+        highest: 0,
+        lowest: 0,
+        trend: "stable",
+        totalEntries: 0,
+      }
+    }
+
+    // Filter entries from the last N days
+    const cutoffDate = new Date()
+    cutoffDate.setDate(cutoffDate.getDate() - days)
+    const recentEntries = entries.filter(
+      (entry) => new Date(entry.timestamp) >= cutoffDate
+    )
+
+    if (recentEntries.length === 0) {
+      return {
+        average: 0,
+        highest: 0,
+        lowest: 0,
+        trend: "stable",
+        totalEntries: 0,
+      }
+    }
+
+    const scores = recentEntries.map((e) => e.score)
+    const average = scores.reduce((a, b) => a + b, 0) / scores.length
+    const highest = Math.max(...scores)
+    const lowest = Math.min(...scores)
+
+    // Calculate trend (compare first half vs second half)
+    let trend: "improving" | "declining" | "stable" = "stable"
+    if (recentEntries.length >= 4) {
+      const midpoint = Math.floor(recentEntries.length / 2)
+      const firstHalf = recentEntries.slice(midpoint).map((e) => e.score)
+      const secondHalf = recentEntries.slice(0, midpoint).map((e) => e.score)
+      const firstAvg = firstHalf.reduce((a, b) => a + b, 0) / firstHalf.length
+      const secondAvg = secondHalf.reduce((a, b) => a + b, 0) / secondHalf.length
+
+      if (secondAvg > firstAvg + 0.5) {
+        trend = "improving"
+      } else if (secondAvg < firstAvg - 0.5) {
+        trend = "declining"
+      }
+    }
+
+    return {
+      average: Math.round(average * 10) / 10,
+      highest,
+      lowest,
+      trend,
+      totalEntries: recentEntries.length,
+    }
+  } catch (error) {
+    console.error("[Redis] Error getting mood stats:", error)
+    return {
+      average: 0,
+      highest: 0,
+      lowest: 0,
+      trend: "stable",
+      totalEntries: 0,
+    }
+  }
+}

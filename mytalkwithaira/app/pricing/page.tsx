@@ -32,7 +32,8 @@ const plans = [
     description: "Everyday users & journaling fans",
     features: [
       "Unlimited chats",
-      "Mood tracking & progress graph",
+      "Advanced mood tracking & history",
+      "Mood progress visualization",
       "Dark mode",
       "Reflection & gratitude prompts",
     ],
