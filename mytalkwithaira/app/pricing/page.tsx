@@ -10,8 +10,7 @@ import { useState } from "react"
 const plans = [
   {
     name: "Free Plan",
-    priceMonthly: "£0",
-    priceYearly: "£0",
+    price: "£0",
     period: "forever",
     description: "Perfect for trying out Aira",
     features: [
@@ -26,9 +25,7 @@ const plans = [
   },
   {
     name: "Aira Premium",
-    priceMonthly: "£8.99",
-    priceYearly: "£89.99",
-    yearlyDiscount: "save 17%",
+    price: "£8.99",
     period: "per month",
     description: "Everything you need for mental wellness",
     features: [
@@ -53,7 +50,6 @@ export default function PricingPage() {
   const { user } = useAuth()
   const router = useRouter()
   const [loading, setLoading] = useState<string | null>(null)
-  const [billingPeriod, setBillingPeriod] = useState<"monthly" | "yearly">("monthly")
 
   const handleSelectPlan = async (planId: string) => {
     if (!user) {
@@ -66,17 +62,6 @@ export default function PricingPage() {
       return
     }
 
-    // For Premium plan, redirect to Lemonsqueezy checkout
-    if (planId === "premium") {
-      const productId = billingPeriod === "monthly"
-        ? process.env.NEXT_PUBLIC_LEMONSQUEEZY_PRODUCT_PREMIUM_MONTHLY
-        : process.env.NEXT_PUBLIC_LEMONSQUEEZY_PRODUCT_PREMIUM_YEARLY
-      localStorage.setItem("pending_plan_upgrade", "premium")
-      const checkoutUrl = `https://talkwithaira.lemonsqueezy.com/buy/${productId}?checkout[email]=${encodeURIComponent(user.email)}&checkout[name]=${encodeURIComponent(user.name || "")}`
-      window.location.href = checkoutUrl
-      return
-    }
-
     // Admin/Owner bypass - no payment needed
     if (user.role === "admin" || user.role === "owner") {
       setLoading(planId)
@@ -86,9 +71,45 @@ export default function PricingPage() {
       return
     }
 
+    // For Premium plan, redirect to Stripe checkout
+    if (planId === "premium") {
+      setLoading(planId)
+
+      try {
+        console.log("[Pricing] Creating Stripe checkout session for:", user.email)
+
+        const response = await fetch("/api/stripe/checkout-session", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email: user.email,
+            userId: user.id,
+            name: user.name,
+          }),
+        })
+
+        const data = await response.json()
+
+        if (!response.ok) {
+          throw new Error(data.error || "Failed to create checkout session")
+        }
+
+        if (data.url) {
+          console.log("[Pricing] Redirecting to Stripe checkout")
+          window.location.href = data.url
+        } else {
+          throw new Error("No checkout URL returned")
+        }
+      } catch (error) {
+        console.error("[Pricing] Checkout error:", error)
+        alert(error instanceof Error ? error.message : "Failed to start checkout. Please try again.")
+        setLoading(null)
+      }
+      return
+    }
+
     setLoading(planId)
-    // Redirect to Stripe checkout
-    router.push(`/checkout?plan=${planId}&billing=${billingPeriod}`)
+    router.push(`/checkout?plan=${planId}`)
   }
 
   return (
@@ -102,32 +123,6 @@ export default function PricingPage() {
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
             Start free and upgrade as your connection with Aira deepens
           </p>
-        </div>
-
-        {/* Billing Toggle */}
-        <div className="flex justify-center mb-12">
-          <div className="inline-flex gap-2 p-1 bg-muted rounded-lg">
-            <button
-              onClick={() => setBillingPeriod("monthly")}
-              className={`px-6 py-2 rounded-md font-medium transition-all ${
-                billingPeriod === "monthly"
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              Monthly
-            </button>
-            <button
-              onClick={() => setBillingPeriod("yearly")}
-              className={`px-6 py-2 rounded-md font-medium transition-all ${
-                billingPeriod === "yearly"
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              Yearly
-            </button>
-          </div>
         </div>
 
         {/* Pricing Cards */}
@@ -155,15 +150,10 @@ export default function PricingPage() {
                 {/* Price */}
                 <div className="flex items-baseline gap-2">
                   <span className="text-5xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-                    {billingPeriod === "monthly" ? plan.priceMonthly : plan.priceYearly}
+                    {plan.price}
                   </span>
                   {plan.planId !== "free" && (
-                    <>
-                      <span className="text-muted-foreground">/{billingPeriod === "monthly" ? "month" : "year"}</span>
-                      {billingPeriod === "yearly" && plan.yearlyDiscount && (
-                        <span className="text-xs font-semibold text-accent ml-2">({plan.yearlyDiscount})</span>
-                      )}
-                    </>
+                    <span className="text-muted-foreground">/{plan.period}</span>
                   )}
                 </div>
 
