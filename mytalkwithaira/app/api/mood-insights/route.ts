@@ -5,7 +5,11 @@
 
 import { NextRequest, NextResponse } from "next/server"
 import { getMoodHistory, getMoodStats } from "@/lib/redis"
-import { openai } from "@/lib/openai"
+import OpenAI from "openai"
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+})
 
 export async function GET(req: NextRequest) {
   try {
