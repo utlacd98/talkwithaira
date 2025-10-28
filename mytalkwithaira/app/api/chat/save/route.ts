@@ -9,7 +9,7 @@ import {
 } from "@/lib/vercel-kv"
 import { incrementConversations, addRecentConversation } from "@/lib/redis"
 import { isMockMode, generateMockSaveResponse, simulateNetworkDelay, getOrCreateMockSession } from "@/lib/mock-services"
-import { supabaseServer } from "@/lib/supabase"
+import { supabaseServer, supabase } from "@/lib/supabase"
 
 interface SaveChatRequest {
   title?: string
@@ -136,55 +136,52 @@ export async function POST(req: NextRequest) {
 
     // Also save to Supabase for persistent storage across deployments
     try {
-      if (supabaseServer) {
-        console.log("[Save Chat API] Attempting to save to Supabase for chatId:", chatId)
+      const supabaseClient = supabaseServer || supabase
+      console.log("[Save Chat API] Attempting to save to Supabase for chatId:", chatId, "using", supabaseServer ? "server" : "client")
 
-        // Save conversation to Supabase
-        const { error: convError } = await supabaseServer
-          .from("conversations")
-          .upsert({
-            id: chatId,
-            user_id: userId,
-            title,
-            message_count: body.messages.length,
-            tags: allTags,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          }, { onConflict: "id" })
+      // Save conversation to Supabase
+      const { error: convError } = await supabaseClient
+        .from("conversations")
+        .upsert({
+          id: chatId,
+          user_id: userId,
+          title,
+          message_count: body.messages.length,
+          tags: allTags,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        }, { onConflict: "id" })
 
-        if (convError) {
-          console.warn("[Save Chat API] Error saving conversation to Supabase:", convError)
-        } else {
-          console.log("[Save Chat API] Successfully saved conversation to Supabase:", chatId)
-
-          // Save messages to Supabase
-          const messagesToInsert = body.messages.map((msg) => ({
-            id: msg.id,
-            conversation_id: chatId,
-            role: msg.role,
-            content: msg.content,
-            emotion: msg.emotion || null,
-            timestamp: typeof msg.timestamp === 'string' ? msg.timestamp : new Date(msg.timestamp).toISOString(),
-          }))
-
-          // Delete old messages first to avoid duplicates
-          await supabaseServer
-            .from("messages")
-            .delete()
-            .eq("conversation_id", chatId)
-
-          const { error: msgError } = await supabaseServer
-            .from("messages")
-            .insert(messagesToInsert)
-
-          if (msgError) {
-            console.warn("[Save Chat API] Error saving messages to Supabase:", msgError)
-          } else {
-            console.log("[Save Chat API] Successfully saved", body.messages.length, "messages to Supabase")
-          }
-        }
+      if (convError) {
+        console.warn("[Save Chat API] Error saving conversation to Supabase:", convError)
       } else {
-        console.warn("[Save Chat API] Supabase server client not initialized - SUPABASE_SERVICE_ROLE_KEY may not be set")
+        console.log("[Save Chat API] Successfully saved conversation to Supabase:", chatId)
+
+        // Save messages to Supabase
+        const messagesToInsert = body.messages.map((msg) => ({
+          id: msg.id,
+          conversation_id: chatId,
+          role: msg.role,
+          content: msg.content,
+          emotion: msg.emotion || null,
+          timestamp: typeof msg.timestamp === 'string' ? msg.timestamp : new Date(msg.timestamp).toISOString(),
+        }))
+
+        // Delete old messages first to avoid duplicates
+        await supabaseClient
+          .from("messages")
+          .delete()
+          .eq("conversation_id", chatId)
+
+        const { error: msgError } = await supabaseClient
+          .from("messages")
+          .insert(messagesToInsert)
+
+        if (msgError) {
+          console.warn("[Save Chat API] Error saving messages to Supabase:", msgError)
+        } else {
+          console.log("[Save Chat API] Successfully saved", body.messages.length, "messages to Supabase")
+        }
       }
     } catch (supabaseError) {
       console.warn("[Save Chat API] Supabase save failed (non-critical):", supabaseError)
@@ -288,12 +285,13 @@ export async function GET(req: NextRequest) {
       }
 
       // If not found in KV or fallback, try Supabase
-      if (!chat && supabaseServer) {
+      if (!chat) {
         try {
+          const supabaseClient = supabaseServer || supabase
           console.log("[Get Chat API] Checking Supabase for chat:", chatId)
 
           // Get conversation from Supabase
-          const { data: convData, error: convError } = await supabaseServer
+          const { data: convData, error: convError } = await supabaseClient
             .from("conversations")
             .select("*")
             .eq("id", chatId)
@@ -302,7 +300,7 @@ export async function GET(req: NextRequest) {
 
           if (!convError && convData) {
             // Get messages from Supabase
-            const { data: messagesData, error: msgError } = await supabaseServer
+            const { data: messagesData, error: msgError } = await supabaseClient
               .from("messages")
               .select("*")
               .eq("conversation_id", chatId)
@@ -375,33 +373,28 @@ export async function GET(req: NextRequest) {
       console.warn("[Get Chats API] Vercel KV unavailable, checking fallback:", kvError)
 
       // Try Supabase next
-      if (supabaseServer) {
-        try {
-          const { data: conversations, error } = await supabaseServer
-            .from("conversations")
-            .select("id, title, message_count, tags, created_at, updated_at")
-            .eq("user_id", userId)
-            .order("updated_at", { ascending: false })
+      try {
+        const supabaseClient = supabaseServer || supabase
+        const { data: conversations, error } = await supabaseClient
+          .from("conversations")
+          .select("id, title, message_count, tags, created_at, updated_at")
+          .eq("user_id", userId)
+          .order("updated_at", { ascending: false })
 
-          if (!error && conversations) {
-            chats = conversations.map((conv: any) => ({
-              id: conv.id,
-              title: conv.title,
-              messageCount: conv.message_count,
-              tags: conv.tags || [],
-              createdAt: conv.created_at,
-              updatedAt: conv.updated_at,
-            }))
-            console.log("[Get Chats API] Retrieved", chats.length, "chats from Supabase for user:", userId)
-          }
-        } catch (supabaseError) {
-          console.warn("[Get Chats API] Supabase lookup failed:", supabaseError)
-          // Fall back to file-based storage
-          chats = await loadFromFallback(userId)
-          console.log("[Get Chats API] Retrieved", chats.length, "chats from file storage for user:", userId)
+        if (!error && conversations) {
+          chats = conversations.map((conv: any) => ({
+            id: conv.id,
+            title: conv.title,
+            messageCount: conv.message_count,
+            tags: conv.tags || [],
+            createdAt: conv.created_at,
+            updatedAt: conv.updated_at,
+          }))
+          console.log("[Get Chats API] Retrieved", chats.length, "chats from Supabase for user:", userId)
         }
-      } else {
-        // Use file-based fallback storage
+      } catch (supabaseError) {
+        console.warn("[Get Chats API] Supabase lookup failed:", supabaseError)
+        // Fall back to file-based storage
         chats = await loadFromFallback(userId)
         console.log("[Get Chats API] Retrieved", chats.length, "chats from file storage for user:", userId)
       }
@@ -442,31 +435,30 @@ export async function DELETE(req: NextRequest) {
 
     // Also delete from Supabase
     try {
-      if (supabaseServer) {
-        // Delete messages first (due to foreign key constraint)
-        const { error: msgError } = await supabaseServer
-          .from("messages")
-          .delete()
-          .eq("conversation_id", chatId)
+      const supabaseClient = supabaseServer || supabase
+      // Delete messages first (due to foreign key constraint)
+      const { error: msgError } = await supabaseClient
+        .from("messages")
+        .delete()
+        .eq("conversation_id", chatId)
 
-        if (msgError) {
-          console.warn("[Delete Chat API] Error deleting messages from Supabase:", msgError)
-        } else {
-          console.log("[Delete Chat API] Deleted messages from Supabase:", chatId)
-        }
+      if (msgError) {
+        console.warn("[Delete Chat API] Error deleting messages from Supabase:", msgError)
+      } else {
+        console.log("[Delete Chat API] Deleted messages from Supabase:", chatId)
+      }
 
-        // Delete conversation
-        const { error: convError } = await supabaseServer
-          .from("conversations")
-          .delete()
-          .eq("id", chatId)
-          .eq("user_id", userId)
+      // Delete conversation
+      const { error: convError } = await supabaseClient
+        .from("conversations")
+        .delete()
+        .eq("id", chatId)
+        .eq("user_id", userId)
 
-        if (convError) {
-          console.warn("[Delete Chat API] Error deleting conversation from Supabase:", convError)
-        } else {
-          console.log("[Delete Chat API] Deleted conversation from Supabase:", chatId)
-        }
+      if (convError) {
+        console.warn("[Delete Chat API] Error deleting conversation from Supabase:", convError)
+      } else {
+        console.log("[Delete Chat API] Deleted conversation from Supabase:", chatId)
       }
     } catch (supabaseError) {
       console.warn("[Delete Chat API] Supabase delete failed (non-critical):", supabaseError)
