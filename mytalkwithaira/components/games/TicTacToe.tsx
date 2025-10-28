@@ -213,6 +213,17 @@ export function TicTacToe() {
     setMoveCount(0)
   }
 
+  // Change difficulty (resets game)
+  const changeDifficulty = (newDifficulty: Difficulty) => {
+    setDifficulty(newDifficulty)
+    setBoard(Array(9).fill(null))
+    setIsXNext(false)
+    setGameStatus("playing")
+    setAiraMessage(getRandomReaction("start"))
+    setGameStarted(false)
+    setMoveCount(0)
+  }
+
   const renderSquare = (index: number) => {
     const value = board[index]
     return (
@@ -289,10 +300,18 @@ export function TicTacToe() {
           )}
 
           {gameStarted && (
-            <div className="text-center">
+            <div className="flex items-center justify-center gap-3">
               <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-sm font-medium">
                 {difficulty === "easy" ? "😊 Easy Mode" : "🔥 Hard Mode"}
               </span>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => changeDifficulty(difficulty === "easy" ? "hard" : "easy")}
+                className="text-xs"
+              >
+                Switch to {difficulty === "easy" ? "Hard" : "Easy"}
+              </Button>
             </div>
           )}
           {/* Board */}

@@ -5,13 +5,15 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { TicTacToe } from "@/components/games/TicTacToe"
 import { MemoryChallenge } from "@/components/games/memory-challenge"
+import { FocusBreather } from "@/components/games/focus-breather"
+import { MoodMatcher } from "@/components/games/mood-matcher"
 import { useAuth } from "@/lib/auth-context"
-import { ArrowLeft, Gamepad2, Zap, Heart, Brain, Trophy, Flame } from "lucide-react"
+import { ArrowLeft, Gamepad2, Zap, Heart, Brain, Trophy, Flame, Wind } from "lucide-react"
 import Link from "next/link"
 import { useState, useEffect } from "react"
 import { ThemeToggle } from "@/components/theme-toggle"
 
-type GameType = "tictactoe" | "memory" | null
+type GameType = "tictactoe" | "memory" | "breather" | "mood-matcher" | null
 
 interface UserStats {
   wins: number
@@ -72,20 +74,20 @@ export default function GamesPage() {
       status: "available",
     },
     {
-      id: "breathing",
+      id: "breather",
       name: "Focus Breather",
-      description: "Guided breathing rhythm timing",
-      icon: Zap,
-      color: "from-secondary to-primary",
-      status: "coming-soon",
+      description: "Guided breathing exercises with calming sounds",
+      icon: Wind,
+      color: "from-cyan-500 to-blue-500",
+      status: "available",
     },
     {
-      id: "mood",
+      id: "mood-matcher",
       name: "Mood Matcher",
-      description: "Emoji reflection game",
+      description: "Match mood pairs and learn about emotions",
       icon: Heart,
-      color: "from-accent to-secondary",
-      status: "coming-soon",
+      color: "from-pink-500 to-rose-500",
+      status: "available",
     },
   ]
 
@@ -119,6 +121,78 @@ export default function GamesPage() {
             </div>
 
             <TicTacToe />
+          </main>
+        </div>
+      </ProtectedRoute>
+    )
+  }
+
+  if (selectedGame === "breather") {
+    return (
+      <ProtectedRoute>
+        <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5">
+          {/* Header */}
+          <header className="border-b border-border/50 backdrop-blur-sm bg-background/80 sticky top-0 z-10">
+            <div className="container mx-auto px-4 h-16 flex items-center justify-between">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setSelectedGame(null)}
+                className="gap-2"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                Back to Games
+              </Button>
+              <ThemeToggle />
+            </div>
+          </header>
+
+          {/* Game Content */}
+          <main className="container mx-auto px-4 py-8 max-w-2xl">
+            <div className="mb-8">
+              <h1 className="text-3xl font-bold font-heading mb-2">Focus Breather</h1>
+              <p className="text-muted-foreground">
+                Practice mindful breathing with guided exercises and calming sounds.
+              </p>
+            </div>
+
+            <FocusBreather />
+          </main>
+        </div>
+      </ProtectedRoute>
+    )
+  }
+
+  if (selectedGame === "mood-matcher") {
+    return (
+      <ProtectedRoute>
+        <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5">
+          {/* Header */}
+          <header className="border-b border-border/50 backdrop-blur-sm bg-background/80 sticky top-0 z-10">
+            <div className="container mx-auto px-4 h-16 flex items-center justify-between">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setSelectedGame(null)}
+                className="gap-2"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                Back to Games
+              </Button>
+              <ThemeToggle />
+            </div>
+          </header>
+
+          {/* Game Content */}
+          <main className="container mx-auto px-4 py-8 max-w-2xl">
+            <div className="mb-8">
+              <h1 className="text-3xl font-bold font-heading mb-2">Mood Matcher</h1>
+              <p className="text-muted-foreground">
+                Match pairs of mood cards and learn about different emotions.
+              </p>
+            </div>
+
+            <MoodMatcher />
           </main>
         </div>
       </ProtectedRoute>
