@@ -133,16 +133,28 @@ export async function POST(req: NextRequest) {
       console.log("[Save Chat API] Successfully saved to file-based fallback storage:", chatId)
     }
 
-    // Update user stats in Redis
+    // Update user stats in Redis with timeout
     try {
       if (userId !== "anonymous") {
-        // Increment conversations count
-        await incrementConversations(userId)
+        // Check if Redis is configured
+        const redisConfigured = !!(process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN)
 
-        // Add to recent conversations
-        const summary = title || `Chat with ${body.messages.length} messages`
-        await addRecentConversation(userId, summary)
-        console.log("[Save Chat API] Updated user stats for:", userId)
+        if (redisConfigured) {
+          // Increment conversations count with timeout
+          const incrementPromise = incrementConversations(userId)
+          const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve(null), 2000))
+          await Promise.race([incrementPromise, timeoutPromise])
+
+          // Add to recent conversations with timeout
+          const summary = title || `Chat with ${body.messages.length} messages`
+          const addRecentPromise = addRecentConversation(userId, summary)
+          const timeoutPromise2 = new Promise((resolve) => setTimeout(() => resolve(null), 2000))
+          await Promise.race([addRecentPromise, timeoutPromise2])
+
+          console.log("[Save Chat API] Updated user stats for:", userId)
+        } else {
+          console.log("[Save Chat API] Redis not configured, skipping stats update")
+        }
       }
     } catch (statsError) {
       console.warn("[Save Chat API] Failed to update stats:", statsError)
