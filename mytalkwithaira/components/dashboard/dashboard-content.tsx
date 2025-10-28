@@ -135,29 +135,7 @@ export function DashboardContent() {
           ))}
         </div>
 
-        {/* Mood Tracker & Premium Features */}
-        {user?.id && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-            <MoodTracker
-              userId={user.id}
-              currentMoodScore={dashboardStats?.mood_score || 5}
-              onUpdate={refetch}
-            />
-            <Affirmations
-              userId={user.id}
-              moodScore={dashboardStats?.mood_score || 5}
-            />
-          </div>
-        )}
-
-        {/* Advanced Mood Insights */}
-        {user?.id && (
-          <div className="mb-8">
-            <MoodInsights userId={user.id} />
-          </div>
-        )}
-
-        {/* Quick Actions */}
+        {/* Quick Actions - Moved up for better visibility */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           <Card className="glass-card">
             <CardHeader>
@@ -208,6 +186,28 @@ export function DashboardContent() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Mood Tracker & Premium Features */}
+        {user?.id && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+            <MoodTracker
+              userId={user.id}
+              currentMoodScore={dashboardStats?.mood_score || 5}
+              onUpdate={refetch}
+            />
+            <Affirmations
+              userId={user.id}
+              moodScore={dashboardStats?.mood_score || 5}
+            />
+          </div>
+        )}
+
+        {/* Advanced Mood Insights */}
+        {user?.id && (
+          <div className="mb-8">
+            <MoodInsights userId={user.id} />
+          </div>
+        )}
 
         {/* Recent Activity */}
         <Card className="glass-card">
