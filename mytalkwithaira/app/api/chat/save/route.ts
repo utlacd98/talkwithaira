@@ -137,6 +137,8 @@ export async function POST(req: NextRequest) {
     // Also save to Supabase for persistent storage across deployments
     try {
       if (supabaseServer) {
+        console.log("[Save Chat API] Attempting to save to Supabase for chatId:", chatId)
+
         // Save conversation to Supabase
         const { error: convError } = await supabaseServer
           .from("conversations")
@@ -162,7 +164,7 @@ export async function POST(req: NextRequest) {
             role: msg.role,
             content: msg.content,
             emotion: msg.emotion || null,
-            timestamp: msg.timestamp,
+            timestamp: typeof msg.timestamp === 'string' ? msg.timestamp : new Date(msg.timestamp).toISOString(),
           }))
 
           // Delete old messages first to avoid duplicates
@@ -181,6 +183,8 @@ export async function POST(req: NextRequest) {
             console.log("[Save Chat API] Successfully saved", body.messages.length, "messages to Supabase")
           }
         }
+      } else {
+        console.warn("[Save Chat API] Supabase server client not initialized - SUPABASE_SERVICE_ROLE_KEY may not be set")
       }
     } catch (supabaseError) {
       console.warn("[Save Chat API] Supabase save failed (non-critical):", supabaseError)
