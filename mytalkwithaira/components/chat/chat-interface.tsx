@@ -157,9 +157,18 @@ export function ChatInterface() {
   }
 
   const handleSelectChat = async (chatId: string, title: string) => {
+    // Prevent multiple clicks while loading
+    if (isLoadingChat) {
+      console.log("[Chat Interface] Already loading a chat, ignoring click")
+      return
+    }
+
     setIsLoadingChat(true)
+    console.log("[Chat Interface] Loading chat:", chatId, title)
+
     try {
       const chatData = await loadChat(chatId, user?.id)
+      console.log("[Chat Interface] Chat loaded successfully:", chatId, "with", chatData.messages.length, "messages")
 
       // Convert timestamp strings back to Date objects
       const loadedMessages: Message[] = chatData.messages.map((msg) => ({
@@ -171,6 +180,7 @@ export function ChatInterface() {
       setCurrentChatTitle(title)
       setSidebarOpen(false)
     } catch (error) {
+      console.error("[Chat Interface] Error loading chat:", error)
       alert(`Failed to load chat: ${error instanceof Error ? error.message : "Unknown error"}`)
     } finally {
       setIsLoadingChat(false)
