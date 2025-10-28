@@ -184,28 +184,36 @@ export async function GET(req: NextRequest) {
         console.log("[Get Chat API] Found chat in Vercel KV:", chatId)
       } catch (kvError) {
         console.warn("[Get Chat API] Vercel KV unavailable, checking fallback:", kvError)
-        // Check fallback storage
-        try {
-          const userDir = path.join(FALLBACK_STORAGE_DIR, userId)
-          const filePath = path.join(userDir, `${chatId}.json`)
-          const content = await fs.readFile(filePath, "utf-8")
-          let fallbackChat = JSON.parse(content)
 
-          // Decrypt if encrypted
-          if (fallbackChat.encrypted && isEncrypted(fallbackChat.messages)) {
-            try {
-              fallbackChat = decryptChatObject(fallbackChat)
-              console.log("[Get Chat API] Decrypted chat from fallback:", chatId)
-            } catch (decryptError) {
-              console.error("[Get Chat API] Error decrypting fallback chat:", decryptError)
-              return NextResponse.json({ error: "Failed to decrypt chat" }, { status: 500 })
+        // Check in-memory storage first
+        const memoryKey = `${userId}:${chatId}`
+        if (IN_MEMORY_STORAGE.has(memoryKey)) {
+          chat = IN_MEMORY_STORAGE.get(memoryKey) || null
+          console.log("[Get Chat API] Retrieved chat from in-memory storage:", memoryKey)
+        } else {
+          // Check file-based fallback storage
+          try {
+            const userDir = path.join(FALLBACK_STORAGE_DIR, userId)
+            const filePath = path.join(userDir, `${chatId}.json`)
+            const content = await fs.readFile(filePath, "utf-8")
+            let fallbackChat = JSON.parse(content)
+
+            // Decrypt if encrypted
+            if (fallbackChat.encrypted && isEncrypted(fallbackChat.messages)) {
+              try {
+                fallbackChat = decryptChatObject(fallbackChat)
+                console.log("[Get Chat API] Decrypted chat from fallback:", chatId)
+              } catch (decryptError) {
+                console.error("[Get Chat API] Error decrypting fallback chat:", decryptError)
+                return NextResponse.json({ error: "Failed to decrypt chat" }, { status: 500 })
+              }
             }
-          }
 
-          chat = fallbackChat as SavedChat
-          console.log("[Get Chat API] Retrieved chat from fallback storage:", chatId)
-        } catch (fallbackError) {
-          console.warn("[Get Chat API] Fallback storage also unavailable:", fallbackError)
+            chat = fallbackChat as SavedChat
+            console.log("[Get Chat API] Retrieved chat from file-based fallback storage:", chatId)
+          } catch (fallbackError) {
+            console.warn("[Get Chat API] File-based fallback storage also unavailable:", fallbackError)
+          }
         }
       }
 
