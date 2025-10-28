@@ -32,12 +32,29 @@ export default function SupportPage() {
   const [helplines, setHelplines] = useState<Helpline[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
+  const [locationQuery, setLocationQuery] = useState("")
   const [selectedCountry, setSelectedCountry] = useState("US")
   const [selectedTopic, setSelectedTopic] = useState("All topics")
+  const [detectedLocation, setDetectedLocation] = useState<string | null>(null)
 
   useEffect(() => {
     loadHelplines()
+    detectLocation()
   }, [selectedCountry])
+
+  const detectLocation = async () => {
+    try {
+      // Try to get user's location from IP
+      const response = await fetch("https://ipapi.co/json/")
+      const data = await response.json()
+      if (data.city && data.region) {
+        setDetectedLocation(`${data.city}, ${data.region}`)
+        setLocationQuery(`${data.city}, ${data.region}`)
+      }
+    } catch (error) {
+      console.log("Could not detect location:", error)
+    }
+  }
 
   const loadHelplines = async () => {
     setLoading(true)
@@ -56,7 +73,18 @@ export default function SupportPage() {
     const matchesSearch = helpline.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                          helpline.snippet.toLowerCase().includes(searchQuery.toLowerCase())
     const matchesTopic = selectedTopic === "All topics" || helpline.topics.includes(selectedTopic)
-    return matchesSearch && matchesTopic
+
+    // Filter by location if specified
+    let matchesLocation = true
+    if (locationQuery.trim()) {
+      const locationLower = locationQuery.toLowerCase()
+      const locations = helpline.locations.lvl1.join(" ").toLowerCase()
+      matchesLocation = locations.includes(locationLower) ||
+                       locations.includes("_nationwide_") ||
+                       helpline.name.toLowerCase().includes(locationLower)
+    }
+
+    return matchesSearch && matchesTopic && matchesLocation
   })
 
   const topics = ["All topics", "Suicidal thoughts", "Anxiety", "Depression", "Abuse & domestic violence", 
@@ -102,46 +130,66 @@ export default function SupportPage() {
         {/* Search and Filters */}
         <Card className="glass-card mb-6">
           <CardContent className="pt-6">
-            <div className="grid gap-4 md:grid-cols-3">
-              {/* Search */}
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search helplines..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
-
-              {/* Country Filter */}
+            <div className="grid gap-4">
+              {/* Location Search - Primary */}
               <div className="relative">
                 <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <select
-                  value={selectedCountry}
-                  onChange={(e) => setSelectedCountry(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                >
-                  <option value="US">United States</option>
-                  <option value="NZ">New Zealand</option>
-                  <option value="GB">United Kingdom</option>
-                  <option value="CA">Canada</option>
-                  <option value="AU">Australia</option>
-                </select>
+                <Input
+                  placeholder="Enter your city, state, or zip code (e.g., Los Angeles, CA or 90210)"
+                  value={locationQuery}
+                  onChange={(e) => setLocationQuery(e.target.value)}
+                  className="pl-10 text-base"
+                />
+                {detectedLocation && !locationQuery && (
+                  <button
+                    onClick={() => setLocationQuery(detectedLocation)}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-xs text-primary hover:underline"
+                  >
+                    Use: {detectedLocation}
+                  </button>
+                )}
               </div>
 
-              {/* Topic Filter */}
-              <select
-                value={selectedTopic}
-                onChange={(e) => setSelectedTopic(e.target.value)}
-                className="w-full px-4 py-2 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-              >
-                {topics.map((topic) => (
-                  <option key={topic} value={topic}>
-                    {topic}
-                  </option>
-                ))}
-              </select>
+              <div className="grid gap-4 md:grid-cols-3">
+                {/* Country Filter */}
+                <div className="relative">
+                  <select
+                    value={selectedCountry}
+                    onChange={(e) => setSelectedCountry(e.target.value)}
+                    className="w-full px-4 py-2 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                  >
+                    <option value="US">🇺🇸 United States</option>
+                    <option value="NZ">🇳🇿 New Zealand</option>
+                    <option value="GB">🇬🇧 United Kingdom</option>
+                    <option value="CA">🇨🇦 Canada</option>
+                    <option value="AU">🇦🇺 Australia</option>
+                  </select>
+                </div>
+
+                {/* Topic Filter */}
+                <select
+                  value={selectedTopic}
+                  onChange={(e) => setSelectedTopic(e.target.value)}
+                  className="w-full px-4 py-2 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                >
+                  {topics.map((topic) => (
+                    <option key={topic} value={topic}>
+                      {topic}
+                    </option>
+                  ))}
+                </select>
+
+                {/* Search Helplines */}
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search helplines..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+              </div>
             </div>
           </CardContent>
         </Card>
