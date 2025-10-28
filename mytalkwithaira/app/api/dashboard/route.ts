@@ -50,27 +50,64 @@ export async function GET(req: NextRequest) {
       )
     }
 
-    // Check Redis health first
+    // Check if Redis is configured
+    const redisConfigured = !!(process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN)
+    if (!redisConfigured) {
+      console.warn("[Dashboard API] Redis not configured, returning default stats")
+      return NextResponse.json(
+        {
+          success: true,
+          data: DEFAULT_STATS,
+          redisHealthy: false,
+          message: "Redis not configured - using default stats",
+        },
+        { status: 200 }
+      )
+    }
+
+    // Check Redis health first with timeout
     let redisHealthy = false
     try {
-      redisHealthy = await healthCheck()
+      const healthCheckPromise = healthCheck()
+      const timeoutPromise = new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 2000))
+      redisHealthy = await Promise.race([healthCheckPromise, timeoutPromise])
+
       if (!redisHealthy) {
-        console.warn("[Dashboard API] Redis health check failed")
+        console.warn("[Dashboard API] Redis health check failed or timed out, using defaults")
+        return NextResponse.json(
+          {
+            success: true,
+            data: DEFAULT_STATS,
+            redisHealthy: false,
+          },
+          { status: 200 }
+        )
       }
     } catch (healthError) {
       console.warn("[Dashboard API] Redis health check error:", healthError instanceof Error ? healthError.message : healthError)
+      return NextResponse.json(
+        {
+          success: true,
+          data: DEFAULT_STATS,
+          redisHealthy: false,
+        },
+        { status: 200 }
+      )
     }
 
     let stats: UserStats | null = null
 
-    // Try to get existing stats
+    // Try to get existing stats with timeout
     try {
-      stats = await getUserStats(userId)
+      const getStatsPromise = getUserStats(userId)
+      const timeoutPromise = new Promise<UserStats | null>((resolve) => setTimeout(() => resolve(null), 2000))
+      stats = await Promise.race([getStatsPromise, timeoutPromise])
+
       if (stats) {
         console.log("[Dashboard API] Retrieved existing stats for user:", userId)
       }
     } catch (redisError) {
-      console.warn("[Dashboard API] Redis unavailable — retrying.", redisError instanceof Error ? redisError.message : redisError)
+      console.warn("[Dashboard API] Redis unavailable:", redisError instanceof Error ? redisError.message : redisError)
       stats = null
     }
 
@@ -78,7 +115,9 @@ export async function GET(req: NextRequest) {
     if (!stats) {
       try {
         console.log("[Dashboard API] Creating new stats for user:", userId)
-        stats = await createUserStats(userId)
+        const createStatsPromise = createUserStats(userId)
+        const timeoutPromise = new Promise<UserStats>((resolve) => setTimeout(() => resolve(DEFAULT_STATS), 2000))
+        stats = await Promise.race([createStatsPromise, timeoutPromise])
         console.log("[Dashboard API] Successfully created stats for user:", userId)
       } catch (createError) {
         console.warn(
@@ -92,7 +131,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(
       {
         success: true,
-        data: stats,
+        data: stats || DEFAULT_STATS,
         redisHealthy,
       },
       { status: 200 }

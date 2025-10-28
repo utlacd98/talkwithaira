@@ -13,9 +13,9 @@ export const redis = kv
  * Retry configuration
  */
 const RETRY_CONFIG = {
-  maxRetries: 3,
-  retryDelayMs: 500,
-  timeoutMs: 30000, // 30 second timeout
+  maxRetries: 2,
+  retryDelayMs: 300,
+  timeoutMs: 3000, // 3 second timeout (Vercel free tier has 10s function timeout)
 }
 
 /**
