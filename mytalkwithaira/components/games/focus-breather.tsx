@@ -43,13 +43,33 @@ const BREATHING_PATTERNS: BreathingPattern[] = [
   },
 ]
 
-// SoundHelix meditation tracks (these are free ambient music tracks)
+// Meditation and ambient sounds from free sources
 const MEDITATION_SOUNDS = [
-  "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3",
-  "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3",
-  "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3",
-  "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3",
-  "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-5.mp3",
+  {
+    name: "Ocean Waves",
+    url: "https://cdn.pixabay.com/audio/2022/05/13/audio_257112e87f.mp3",
+    description: "Calming ocean waves",
+  },
+  {
+    name: "Rain Sounds",
+    url: "https://cdn.pixabay.com/audio/2022/03/10/audio_4deafc4dc2.mp3",
+    description: "Gentle rainfall",
+  },
+  {
+    name: "Forest Ambience",
+    url: "https://cdn.pixabay.com/audio/2022/03/15/audio_c8a8c7f3f0.mp3",
+    description: "Peaceful forest sounds",
+  },
+  {
+    name: "Meditation Bell",
+    url: "https://cdn.pixabay.com/audio/2021/08/04/audio_0625c1539c.mp3",
+    description: "Tibetan singing bowl",
+  },
+  {
+    name: "White Noise",
+    url: "https://cdn.pixabay.com/audio/2022/03/12/audio_c8e87f1d5c.mp3",
+    description: "Soothing white noise",
+  },
 ]
 
 export function FocusBreather() {
@@ -59,7 +79,7 @@ export function FocusBreather() {
   const [selectedPattern, setSelectedPattern] = useState(BREATHING_PATTERNS[0])
   const [cyclesCompleted, setCyclesCompleted] = useState(0)
   const [isMuted, setIsMuted] = useState(false)
-  const [currentSound, setCurrentSound] = useState<string>("")
+  const [currentSound, setCurrentSound] = useState<typeof MEDITATION_SOUNDS[0] | null>(null)
   const audioRef = useRef<HTMLAudioElement | null>(null)
 
   // Select random sound on mount
@@ -71,7 +91,7 @@ export function FocusBreather() {
   // Initialize audio
   useEffect(() => {
     if (currentSound && !audioRef.current) {
-      audioRef.current = new Audio(currentSound)
+      audioRef.current = new Audio(currentSound.url)
       audioRef.current.loop = true
       audioRef.current.volume = 0.3
     }
@@ -169,6 +189,19 @@ export function FocusBreather() {
     }
   }
 
+  const changeSound = (sound: typeof MEDITATION_SOUNDS[0]) => {
+    setCurrentSound(sound)
+    if (audioRef.current) {
+      audioRef.current.pause()
+      audioRef.current = new Audio(sound.url)
+      audioRef.current.loop = true
+      audioRef.current.volume = 0.3
+      if (isActive && !isMuted) {
+        audioRef.current.play().catch((err) => console.log("Audio play failed:", err))
+      }
+    }
+  }
+
   const getPhaseColor = () => {
     switch (currentPhase) {
       case "inhale":
@@ -222,6 +255,33 @@ export function FocusBreather() {
                 </div>
               </button>
             ))}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Sound Selection */}
+      {!isActive && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Choose Your Sound</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 gap-3">
+              {MEDITATION_SOUNDS.map((sound) => (
+                <button
+                  key={sound.name}
+                  onClick={() => changeSound(sound)}
+                  className={`p-3 rounded-lg border-2 transition-all text-left ${
+                    currentSound?.name === sound.name
+                      ? "border-primary bg-primary/10"
+                      : "border-border hover:border-primary/50"
+                  }`}
+                >
+                  <div className="font-semibold text-sm">{sound.name}</div>
+                  <div className="text-xs text-muted-foreground">{sound.description}</div>
+                </button>
+              ))}
+            </div>
           </CardContent>
         </Card>
       )}
@@ -281,9 +341,16 @@ export function FocusBreather() {
 
             {/* Pattern Info */}
             {isActive && (
-              <div className="text-center p-3 rounded-lg bg-muted">
-                <div className="text-sm font-semibold">{selectedPattern.name}</div>
-                <div className="text-xs text-muted-foreground">{selectedPattern.description}</div>
+              <div className="text-center space-y-2">
+                <div className="p-3 rounded-lg bg-muted">
+                  <div className="text-sm font-semibold">{selectedPattern.name}</div>
+                  <div className="text-xs text-muted-foreground">{selectedPattern.description}</div>
+                </div>
+                {currentSound && (
+                  <div className="p-2 rounded-lg bg-primary/10">
+                    <div className="text-xs font-medium">🎵 {currentSound.name}</div>
+                  </div>
+                )}
               </div>
             )}
           </div>
