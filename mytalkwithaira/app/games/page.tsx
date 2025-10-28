@@ -4,15 +4,14 @@ import { ProtectedRoute } from "@/components/protected-route"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { TicTacToe } from "@/components/games/TicTacToe"
-import { NoughtsCrossesMultiplayer } from "@/components/games/noughts-crosses-multiplayer"
 import { MemoryChallenge } from "@/components/games/memory-challenge"
 import { useAuth } from "@/lib/auth-context"
-import { ArrowLeft, Gamepad2, Zap, Heart, Brain, Trophy, Flame, Users } from "lucide-react"
+import { ArrowLeft, Gamepad2, Zap, Heart, Brain, Trophy, Flame } from "lucide-react"
 import Link from "next/link"
 import { useState, useEffect } from "react"
 import { ThemeToggle } from "@/components/theme-toggle"
 
-type GameType = "tictactoe" | "multiplayer-noughts" | "memory" | null
+type GameType = "tictactoe" | "memory" | null
 
 interface UserStats {
   wins: number
@@ -57,10 +56,10 @@ export default function GamesPage() {
 
   const games = [
     {
-      id: "multiplayer-noughts",
-      name: "Noughts & Crosses - Multiplayer",
-      description: "Play against real players online",
-      icon: Users,
+      id: "tictactoe",
+      name: "Noughts & Crosses",
+      description: "Classic Tic-Tac-Toe with AI opponent (Easy & Hard modes)",
+      icon: Gamepad2,
       color: "from-primary to-accent",
       status: "available",
     },
@@ -70,14 +69,6 @@ export default function GamesPage() {
       description: "Test your memory skills",
       icon: Brain,
       color: "from-purple-500 to-pink-500",
-      status: "available",
-    },
-    {
-      id: "tictactoe",
-      name: "Noughts & Crosses - AI",
-      description: "Classic Tic-Tac-Toe with AI opponent",
-      icon: Gamepad2,
-      color: "from-blue-500 to-cyan-500",
       status: "available",
     },
     {
@@ -128,42 +119,6 @@ export default function GamesPage() {
             </div>
 
             <TicTacToe />
-          </main>
-        </div>
-      </ProtectedRoute>
-    )
-  }
-
-  if (selectedGame === "multiplayer-noughts") {
-    return (
-      <ProtectedRoute>
-        <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5">
-          {/* Header */}
-          <header className="border-b border-border/50 backdrop-blur-sm bg-background/80 sticky top-0 z-10">
-            <div className="container mx-auto px-4 h-16 flex items-center justify-between">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setSelectedGame(null)}
-                className="gap-2"
-              >
-                <ArrowLeft className="w-4 h-4" />
-                Back to Games
-              </Button>
-              <ThemeToggle />
-            </div>
-          </header>
-
-          {/* Game Content */}
-          <main className="container mx-auto px-4 py-8 max-w-2xl">
-            <div className="mb-8">
-              <h1 className="text-3xl font-bold font-heading mb-2">Noughts & Crosses - Multiplayer</h1>
-              <p className="text-muted-foreground">
-                Play against real players online in real-time!
-              </p>
-            </div>
-
-            <NoughtsCrossesMultiplayer />
           </main>
         </div>
       </ProtectedRoute>

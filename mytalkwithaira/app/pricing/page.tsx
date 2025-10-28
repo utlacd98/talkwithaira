@@ -11,54 +11,41 @@ const plans = [
   {
     name: "Free Plan",
     priceMonthly: "£0",
-    priceYearly: "–",
+    priceYearly: "£0",
     period: "forever",
     description: "Perfect for trying out Aira",
     features: [
       "10 chats/day",
-      "Mood tracker (manual)",
-      "Basic responses",
+      "Basic mood tracker",
+      "Basic AI responses",
+      "Mini games",
     ],
     cta: "Get Started",
     planId: "free",
     highlighted: false,
   },
   {
-    name: "Aira Plus",
-    priceMonthly: "£4.99",
-    priceYearly: "£49.99/yr",
-    yearlyDiscount: "save 15%",
-    period: "per month",
-    description: "Everyday users & journaling fans",
-    features: [
-      "Unlimited chats",
-      "Advanced mood tracking & history",
-      "Mood progress visualization",
-      "Dark mode",
-      "Reflection & gratitude prompts",
-    ],
-    cta: "Upgrade to Plus",
-    planId: "plus",
-    highlighted: true,
-  },
-  {
     name: "Aira Premium",
     priceMonthly: "£8.99",
-    priceYearly: "£89.99/yr",
-    yearlyDiscount: "save 20%",
+    priceYearly: "£89.99",
+    yearlyDiscount: "save 17%",
     period: "per month",
-    description: "Advanced features & priority support",
+    description: "Everything you need for mental wellness",
     features: [
-      "Everything in Plus",
-      "Advanced mood insights (AI analysis)",
+      "Unlimited chats with Aira",
+      "Advanced mood tracking & history",
+      "Mood progress visualization",
+      "AI-powered mood insights",
       "Personalized affirmations",
-      "Multi-language chat",
+      "Support resources finder",
+      "All mini games unlocked",
+      "Dark mode",
       "Priority support",
-      "Early access to new Aira features",
+      "Early access to new features",
     ],
     cta: "Upgrade to Premium",
     planId: "premium",
-    highlighted: false,
+    highlighted: true,
   },
 ]
 
@@ -79,17 +66,11 @@ export default function PricingPage() {
       return
     }
 
-    // For paid plans, redirect to Lemonsqueezy checkout
-    if (planId === "plus") {
-      const productId = process.env.NEXT_PUBLIC_LEMONSQUEEZY_PRODUCT_PLUS
-      localStorage.setItem("pending_plan_upgrade", "plus")
-      const checkoutUrl = `https://talkwithaira.lemonsqueezy.com/buy/${productId}?checkout[email]=${encodeURIComponent(user.email)}&checkout[name]=${encodeURIComponent(user.name || "")}`
-      window.location.href = checkoutUrl
-      return
-    }
-
+    // For Premium plan, redirect to Lemonsqueezy checkout
     if (planId === "premium") {
-      const productId = process.env.NEXT_PUBLIC_LEMONSQUEEZY_PRODUCT_PREMIUM
+      const productId = billingPeriod === "monthly"
+        ? process.env.NEXT_PUBLIC_LEMONSQUEEZY_PRODUCT_PREMIUM_MONTHLY
+        : process.env.NEXT_PUBLIC_LEMONSQUEEZY_PRODUCT_PREMIUM_YEARLY
       localStorage.setItem("pending_plan_upgrade", "premium")
       const checkoutUrl = `https://talkwithaira.lemonsqueezy.com/buy/${productId}?checkout[email]=${encodeURIComponent(user.email)}&checkout[name]=${encodeURIComponent(user.name || "")}`
       window.location.href = checkoutUrl
@@ -150,7 +131,7 @@ export default function PricingPage() {
         </div>
 
         {/* Pricing Cards */}
-        <div className="grid md:grid-cols-3 gap-8 max-w-7xl mx-auto">
+        <div className="grid md:grid-cols-2 gap-8 max-w-5xl mx-auto">
           {plans.map((plan) => (
             <Card
               key={plan.planId}

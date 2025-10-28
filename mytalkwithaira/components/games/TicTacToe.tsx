@@ -9,6 +9,7 @@ import { RotateCcw, Volume2 } from "lucide-react"
 
 type BoardValue = "X" | "O" | null
 type GameStatus = "playing" | "won" | "lost" | "draw"
+type Difficulty = "easy" | "hard"
 
 interface GameStats {
   wins: number
@@ -26,6 +27,7 @@ export function TicTacToe() {
   const [gameStarted, setGameStarted] = useState(false)
   const [moveCount, setMoveCount] = useState(0)
   const [isSavingStats, setIsSavingStats] = useState(false)
+  const [difficulty, setDifficulty] = useState<Difficulty>("easy")
 
   // Save game stats to Redis
   const saveGameStats = async (result: "win" | "loss" | "draw") => {
@@ -111,6 +113,15 @@ export function TicTacToe() {
 
   // Get best move for AI
   const getBestMove = (squares: BoardValue[]): number => {
+    // Easy mode: 50% chance to make a random move instead of optimal
+    if (difficulty === "easy" && Math.random() < 0.5) {
+      const availableMoves = squares
+        .map((val, idx) => (val === null ? idx : null))
+        .filter((val) => val !== null) as number[]
+      return availableMoves[Math.floor(Math.random() * availableMoves.length)]
+    }
+
+    // Hard mode: Always use minimax for optimal play
     let bestScore = -Infinity
     let bestMove = 0
     for (let i = 0; i < 9; i++) {
@@ -249,6 +260,41 @@ export function TicTacToe() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
+          {/* Difficulty Selector */}
+          {!gameStarted && (
+            <div className="space-y-3">
+              <p className="text-sm font-semibold text-muted-foreground">Select Difficulty:</p>
+              <div className="grid grid-cols-2 gap-3">
+                <Button
+                  variant={difficulty === "easy" ? "default" : "outline"}
+                  onClick={() => setDifficulty("easy")}
+                  className="gap-2"
+                >
+                  😊 Easy
+                </Button>
+                <Button
+                  variant={difficulty === "hard" ? "default" : "outline"}
+                  onClick={() => setDifficulty("hard")}
+                  className="gap-2"
+                >
+                  🔥 Hard
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground text-center">
+                {difficulty === "easy"
+                  ? "Aira will make some mistakes - perfect for beginners!"
+                  : "Aira plays optimally - can you beat the AI?"}
+              </p>
+            </div>
+          )}
+
+          {gameStarted && (
+            <div className="text-center">
+              <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-sm font-medium">
+                {difficulty === "easy" ? "😊 Easy Mode" : "🔥 Hard Mode"}
+              </span>
+            </div>
+          )}
           {/* Board */}
           <div className="flex justify-center">
             <div className="grid grid-cols-3 gap-2 bg-muted p-4 rounded-lg">
