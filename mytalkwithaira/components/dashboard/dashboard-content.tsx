@@ -3,7 +3,7 @@
 import { useAuth } from "@/lib/auth-context"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Sparkles, MessageSquare, TrendingUp, Heart, Settings, Crown, CheckCircle, Gamepad2, LifeBuoy } from "lucide-react"
+import { Sparkles, MessageSquare, TrendingUp, Heart, Settings, Crown, CheckCircle, Gamepad2, LifeBuoy, BookOpen } from "lucide-react"
 import Link from "next/link"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { useSearchParams } from "next/navigation"
@@ -275,6 +275,12 @@ export function DashboardContent() {
               <Button variant="ghost" className="gap-2">
                 <LifeBuoy className="w-4 h-4" />
                 Support Resources
+              </Button>
+            </Link>
+            <Link href="/blog">
+              <Button variant="ghost" className="gap-2">
+                <BookOpen className="w-4 h-4" />
+                Blog
               </Button>
             </Link>
             <Link href="/settings">
