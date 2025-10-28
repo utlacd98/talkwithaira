@@ -135,57 +135,61 @@ export async function POST(req: NextRequest) {
     }
 
     // Also save to Supabase for persistent storage across deployments
-    try {
-      const supabaseClient = supabaseServer || supabase
-      console.log("[Save Chat API] Attempting to save to Supabase for chatId:", chatId, "using", supabaseServer ? "server" : "client")
+    // Only attempt Supabase save for authenticated users with service role key
+    if (userId && userId !== "anonymous" && supabaseServer) {
+      try {
+        console.log("[Save Chat API] Attempting to save to Supabase for authenticated user:", userId)
 
-      // Save conversation to Supabase
-      const { error: convError } = await supabaseClient
-        .from("conversations")
-        .upsert({
-          id: chatId,
-          user_id: userId,
-          title,
-          message_count: body.messages.length,
-          tags: allTags,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        }, { onConflict: "id" })
+        // Save conversation to Supabase using server client (bypasses RLS)
+        const { error: convError } = await supabaseServer
+          .from("conversations")
+          .upsert({
+            id: chatId,
+            user_id: userId,
+            title,
+            message_count: body.messages.length,
+            tags: allTags,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          }, { onConflict: "id" })
 
-      if (convError) {
-        console.warn("[Save Chat API] Error saving conversation to Supabase:", convError)
-      } else {
-        console.log("[Save Chat API] Successfully saved conversation to Supabase:", chatId)
-
-        // Save messages to Supabase
-        const messagesToInsert = body.messages.map((msg) => ({
-          id: msg.id,
-          conversation_id: chatId,
-          role: msg.role,
-          content: msg.content,
-          emotion: msg.emotion || null,
-          timestamp: typeof msg.timestamp === 'string' ? msg.timestamp : new Date(msg.timestamp).toISOString(),
-        }))
-
-        // Delete old messages first to avoid duplicates
-        await supabaseClient
-          .from("messages")
-          .delete()
-          .eq("conversation_id", chatId)
-
-        const { error: msgError } = await supabaseClient
-          .from("messages")
-          .insert(messagesToInsert)
-
-        if (msgError) {
-          console.warn("[Save Chat API] Error saving messages to Supabase:", msgError)
+        if (convError) {
+          console.warn("[Save Chat API] Error saving conversation to Supabase:", convError)
         } else {
-          console.log("[Save Chat API] Successfully saved", body.messages.length, "messages to Supabase")
+          console.log("[Save Chat API] Successfully saved conversation to Supabase:", chatId)
+
+          // Save messages to Supabase
+          const messagesToInsert = body.messages.map((msg) => ({
+            id: msg.id,
+            conversation_id: chatId,
+            role: msg.role,
+            content: msg.content,
+            emotion: msg.emotion || null,
+            timestamp: typeof msg.timestamp === 'string' ? msg.timestamp : new Date(msg.timestamp).toISOString(),
+          }))
+
+          // Delete old messages first to avoid duplicates
+          await supabaseServer
+            .from("messages")
+            .delete()
+            .eq("conversation_id", chatId)
+
+          const { error: msgError } = await supabaseServer
+            .from("messages")
+            .insert(messagesToInsert)
+
+          if (msgError) {
+            console.warn("[Save Chat API] Error saving messages to Supabase:", msgError)
+          } else {
+            console.log("[Save Chat API] Successfully saved", body.messages.length, "messages to Supabase")
+          }
         }
+      } catch (supabaseError) {
+        console.warn("[Save Chat API] Supabase save failed (non-critical):", supabaseError)
+        // Don't fail the entire save if Supabase fails - KV storage is primary
       }
-    } catch (supabaseError) {
-      console.warn("[Save Chat API] Supabase save failed (non-critical):", supabaseError)
-      // Don't fail the entire save if Supabase fails - KV storage is primary
+    } else {
+      console.log("[Save Chat API] Skipping Supabase - anonymous user or service role key not available")
     }
 
     // Update user stats in Redis with timeout
