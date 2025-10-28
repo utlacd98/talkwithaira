@@ -3,7 +3,7 @@
 import { useAuth } from "@/lib/auth-context"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Sparkles, MessageSquare, TrendingUp, Heart, Settings, Crown, CheckCircle, Gamepad2 } from "lucide-react"
+import { Sparkles, MessageSquare, TrendingUp, Heart, Settings, Crown, CheckCircle, Gamepad2, LifeBuoy } from "lucide-react"
 import Link from "next/link"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { useSearchParams } from "next/navigation"
@@ -243,14 +243,22 @@ export function DashboardContent() {
           </CardContent>
         </Card>
 
-        {/* Settings Link */}
+        {/* Settings and Support Links */}
         <div className="mt-8 text-center pb-8 border-t border-border/30">
-          <Link href="/settings">
-            <Button variant="ghost" className="gap-2 mt-6">
-              <Settings className="w-4 h-4" />
-              Account Settings
-            </Button>
-          </Link>
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mt-6">
+            <Link href="/support">
+              <Button variant="ghost" className="gap-2">
+                <LifeBuoy className="w-4 h-4" />
+                Support Resources
+              </Button>
+            </Link>
+            <Link href="/settings">
+              <Button variant="ghost" className="gap-2">
+                <Settings className="w-4 h-4" />
+                Account Settings
+              </Button>
+            </Link>
+          </div>
         </div>
       </main>
     </div>

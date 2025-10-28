@@ -6,7 +6,7 @@ import { useState, useRef, useEffect } from "react"
 import { useAuth } from "@/lib/auth-context"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
-import { Send, Sparkles, Menu, Save, Trash2, History } from "lucide-react"
+import { Send, Sparkles, Menu, Save, Trash2, History, LifeBuoy } from "lucide-react"
 import { ChatMessage } from "./chat-message"
 import { EmotionRing } from "./emotion-ring"
 import { ChatSidebar, type ChatSidebarHandle } from "./chat-sidebar"
@@ -233,6 +233,17 @@ export function ChatInterface() {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <Link href="/support">
+              <Button
+                variant="ghost"
+                size="sm"
+                title="Support Resources"
+                className="text-primary hover:text-primary"
+              >
+                <LifeBuoy className="w-4 h-4" />
+              </Button>
+            </Link>
+
             <Button
               variant="ghost"
               size="sm"
