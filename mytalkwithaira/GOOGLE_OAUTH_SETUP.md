@@ -1,5 +1,14 @@
 # 🔐 Google OAuth Setup Guide
 
+## ⚠️ **CURRENT STATUS: TEMPORARILY DISABLED**
+
+**Date:** 2025-10-27
+**Issue:** `redirect_uri_mismatch` error - Google OAuth credentials from old "Talkwithaira" project
+**Action Taken:** Google Sign-In button temporarily disabled in login/signup pages
+**Next Steps:** Follow the setup instructions below to configure Google OAuth properly
+
+---
+
 ## ✅ What We've Implemented
 
 We've successfully integrated **Supabase Google OAuth** into your Aira app! This provides:

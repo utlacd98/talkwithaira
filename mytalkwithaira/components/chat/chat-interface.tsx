@@ -130,10 +130,17 @@ export function ChatInterface() {
     setIsSaving(true)
     try {
       const result = await saveChat(messages, undefined, user?.id)
+      console.log("[Chat Interface] Chat saved successfully:", result)
       alert(`✅ Chat saved! ID: ${result.id}\nTitle: ${result.title}\nMessages: ${result.messageCount}`)
+
       // Refresh the sidebar to show the new chat
-      sidebarRef.current?.refresh()
+      console.log("[Chat Interface] Refreshing sidebar...")
+      await sidebarRef.current?.refresh()
+
+      // Open the sidebar so user can see the new chat
+      setSidebarOpen(true)
     } catch (error) {
+      console.error("[Chat Interface] Error saving chat:", error)
       alert(`❌ Failed to save chat: ${error instanceof Error ? error.message : "Unknown error"}`)
     } finally {
       setIsSaving(false)

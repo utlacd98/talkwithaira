@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, forwardRef, useImperativeHandle } from "react"
+import { useState, useEffect, forwardRef, useImperativeHandle, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { ChevronLeft, ChevronRight, Loader2, Trash2, MessageSquare } from "lucide-react"
 import { getSavedChats, deleteChat, type SavedChat } from "@/lib/chat-utils"
@@ -23,7 +23,7 @@ export const ChatSidebar = forwardRef<ChatSidebarHandle, ChatSidebarProps>(
     const [error, setError] = useState<string | null>(null)
     const [hoveredChatId, setHoveredChatId] = useState<string | null>(null)
 
-    const loadChats = async () => {
+    const loadChats = useCallback(async () => {
       const finalUserId = userId || "anonymous"
 
       console.log("[Chat Sidebar] Loading chats for user:", finalUserId)
@@ -31,7 +31,7 @@ export const ChatSidebar = forwardRef<ChatSidebarHandle, ChatSidebarProps>(
       setError(null)
       try {
         const savedChats = await getSavedChats(finalUserId)
-        console.log("[Chat Sidebar] Loaded", savedChats.length, "chats")
+        console.log("[Chat Sidebar] Loaded", savedChats.length, "chats:", savedChats.map(c => c.title))
         setChats(savedChats)
       } catch (err) {
         const errorMsg = err instanceof Error ? err.message : "Failed to load chats"
@@ -40,11 +40,11 @@ export const ChatSidebar = forwardRef<ChatSidebarHandle, ChatSidebarProps>(
       } finally {
         setIsLoading(false)
       }
-    }
+    }, [userId])
 
     useEffect(() => {
       loadChats()
-    }, [userId])
+    }, [loadChats])
 
     useImperativeHandle(ref, () => ({
       refresh: loadChats,
