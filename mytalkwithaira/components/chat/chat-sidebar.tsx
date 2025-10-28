@@ -58,10 +58,13 @@ export const ChatSidebar = forwardRef<ChatSidebarHandle, ChatSidebarProps>(
     }
 
     try {
-      await deleteChat(chatId)
+      const finalUserId = userId || "anonymous"
+      await deleteChat(chatId, finalUserId)
       setChats((prev) => prev.filter((chat) => chat.id !== chatId))
+      console.log("[Chat Sidebar] Chat deleted successfully:", chatId)
     } catch (err) {
       alert(`Failed to delete chat: ${err instanceof Error ? err.message : "Unknown error"}`)
+      console.error("[Chat Sidebar] Error deleting chat:", err)
     }
   }
 

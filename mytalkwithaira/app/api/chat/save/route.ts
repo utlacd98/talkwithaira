@@ -9,6 +9,7 @@ import {
 } from "@/lib/vercel-kv"
 import { incrementConversations, addRecentConversation } from "@/lib/redis"
 import { isMockMode, generateMockSaveResponse, simulateNetworkDelay, getOrCreateMockSession } from "@/lib/mock-services"
+import { supabaseServer } from "@/lib/supabase"
 
 interface SaveChatRequest {
   title?: string
@@ -113,7 +114,7 @@ export async function POST(req: NextRequest) {
     const autoTags = extractTags(body.messages)
     const allTags = [...new Set([...(body.tags || []), ...autoTags])]
 
-    // Try to save to Vercel KV, fallback to file-based storage
+    // Try to save to Vercel KV first
     try {
       await saveConversation(chatId, userId, title, body.messages, allTags)
       console.log("[Save Chat API] Successfully saved to Vercel KV:", chatId)
@@ -131,6 +132,59 @@ export async function POST(req: NextRequest) {
       }
       await saveToFallback(chatId, userId, chat)
       console.log("[Save Chat API] Successfully saved to file-based fallback storage:", chatId)
+    }
+
+    // Also save to Supabase for persistent storage across deployments
+    try {
+      if (supabaseServer) {
+        // Save conversation to Supabase
+        const { error: convError } = await supabaseServer
+          .from("conversations")
+          .upsert({
+            id: chatId,
+            user_id: userId,
+            title,
+            message_count: body.messages.length,
+            tags: allTags,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          }, { onConflict: "id" })
+
+        if (convError) {
+          console.warn("[Save Chat API] Error saving conversation to Supabase:", convError)
+        } else {
+          console.log("[Save Chat API] Successfully saved conversation to Supabase:", chatId)
+
+          // Save messages to Supabase
+          const messagesToInsert = body.messages.map((msg) => ({
+            id: msg.id,
+            conversation_id: chatId,
+            role: msg.role,
+            content: msg.content,
+            emotion: msg.emotion || null,
+            timestamp: msg.timestamp,
+          }))
+
+          // Delete old messages first to avoid duplicates
+          await supabaseServer
+            .from("messages")
+            .delete()
+            .eq("conversation_id", chatId)
+
+          const { error: msgError } = await supabaseServer
+            .from("messages")
+            .insert(messagesToInsert)
+
+          if (msgError) {
+            console.warn("[Save Chat API] Error saving messages to Supabase:", msgError)
+          } else {
+            console.log("[Save Chat API] Successfully saved", body.messages.length, "messages to Supabase")
+          }
+        }
+      }
+    } catch (supabaseError) {
+      console.warn("[Save Chat API] Supabase save failed (non-critical):", supabaseError)
+      // Don't fail the entire save if Supabase fails - KV storage is primary
     }
 
     // Update user stats in Redis with timeout
@@ -229,6 +283,51 @@ export async function GET(req: NextRequest) {
         }
       }
 
+      // If not found in KV or fallback, try Supabase
+      if (!chat && supabaseServer) {
+        try {
+          console.log("[Get Chat API] Checking Supabase for chat:", chatId)
+
+          // Get conversation from Supabase
+          const { data: convData, error: convError } = await supabaseServer
+            .from("conversations")
+            .select("*")
+            .eq("id", chatId)
+            .eq("user_id", userId)
+            .single()
+
+          if (!convError && convData) {
+            // Get messages from Supabase
+            const { data: messagesData, error: msgError } = await supabaseServer
+              .from("messages")
+              .select("*")
+              .eq("conversation_id", chatId)
+              .order("timestamp", { ascending: true })
+
+            if (!msgError && messagesData) {
+              chat = {
+                id: convData.id,
+                title: convData.title,
+                messages: messagesData.map((msg: any) => ({
+                  id: msg.id,
+                  role: msg.role,
+                  content: msg.content,
+                  emotion: msg.emotion,
+                  timestamp: msg.timestamp,
+                })),
+                tags: convData.tags || [],
+                createdAt: convData.created_at,
+                updatedAt: convData.updated_at,
+                messageCount: convData.message_count,
+              }
+              console.log("[Get Chat API] Retrieved chat from Supabase:", chatId)
+            }
+          }
+        } catch (supabaseError) {
+          console.warn("[Get Chat API] Supabase lookup failed:", supabaseError)
+        }
+      }
+
       if (!chat) {
         console.warn("[Get Chat API] Chat not found:", chatId)
         return NextResponse.json({ error: "Chat not found" }, { status: 404 })
@@ -269,10 +368,39 @@ export async function GET(req: NextRequest) {
       chats = await getUserConversations(userId)
       console.log("[Get Chats API] Retrieved", chats.length, "chats from Vercel KV for user:", userId)
     } catch (kvError) {
-      console.warn("[Get Chats API] Vercel KV unavailable, using file-based fallback:", kvError)
-      // Use file-based fallback storage
-      chats = await loadFromFallback(userId)
-      console.log("[Get Chats API] Retrieved", chats.length, "chats from file storage for user:", userId)
+      console.warn("[Get Chats API] Vercel KV unavailable, checking fallback:", kvError)
+
+      // Try Supabase next
+      if (supabaseServer) {
+        try {
+          const { data: conversations, error } = await supabaseServer
+            .from("conversations")
+            .select("id, title, message_count, tags, created_at, updated_at")
+            .eq("user_id", userId)
+            .order("updated_at", { ascending: false })
+
+          if (!error && conversations) {
+            chats = conversations.map((conv: any) => ({
+              id: conv.id,
+              title: conv.title,
+              messageCount: conv.message_count,
+              tags: conv.tags || [],
+              createdAt: conv.created_at,
+              updatedAt: conv.updated_at,
+            }))
+            console.log("[Get Chats API] Retrieved", chats.length, "chats from Supabase for user:", userId)
+          }
+        } catch (supabaseError) {
+          console.warn("[Get Chats API] Supabase lookup failed:", supabaseError)
+          // Fall back to file-based storage
+          chats = await loadFromFallback(userId)
+          console.log("[Get Chats API] Retrieved", chats.length, "chats from file storage for user:", userId)
+        }
+      } else {
+        // Use file-based fallback storage
+        chats = await loadFromFallback(userId)
+        console.log("[Get Chats API] Retrieved", chats.length, "chats from file storage for user:", userId)
+      }
     }
 
     return NextResponse.json({
@@ -306,6 +434,39 @@ export async function DELETE(req: NextRequest) {
       console.warn("[Delete Chat API] Vercel KV unavailable, using file-based fallback:", kvError)
       // Delete from file-based fallback storage
       await deleteFromFallback(chatId, userId)
+    }
+
+    // Also delete from Supabase
+    try {
+      if (supabaseServer) {
+        // Delete messages first (due to foreign key constraint)
+        const { error: msgError } = await supabaseServer
+          .from("messages")
+          .delete()
+          .eq("conversation_id", chatId)
+
+        if (msgError) {
+          console.warn("[Delete Chat API] Error deleting messages from Supabase:", msgError)
+        } else {
+          console.log("[Delete Chat API] Deleted messages from Supabase:", chatId)
+        }
+
+        // Delete conversation
+        const { error: convError } = await supabaseServer
+          .from("conversations")
+          .delete()
+          .eq("id", chatId)
+          .eq("user_id", userId)
+
+        if (convError) {
+          console.warn("[Delete Chat API] Error deleting conversation from Supabase:", convError)
+        } else {
+          console.log("[Delete Chat API] Deleted conversation from Supabase:", chatId)
+        }
+      }
+    } catch (supabaseError) {
+      console.warn("[Delete Chat API] Supabase delete failed (non-critical):", supabaseError)
+      // Don't fail the delete if Supabase fails - KV storage is primary
     }
 
     return NextResponse.json({

@@ -160,11 +160,18 @@ export async function loadChat(
 /**
  * Delete a saved chat
  * @param chatId - ID of the chat to delete
+ * @param userId - ID of the user (optional, will use from context if not provided)
  * @returns Promise with success status
  */
-export async function deleteChat(chatId: string): Promise<boolean> {
+export async function deleteChat(chatId: string, userId?: string): Promise<boolean> {
   try {
-    const response = await fetch(`/api/chat/save?chatId=${chatId}`, {
+    const params = new URLSearchParams()
+    params.append("chatId", chatId)
+    if (userId) {
+      params.append("userId", userId)
+    }
+
+    const response = await fetch(`/api/chat/save?${params.toString()}`, {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },
     })
