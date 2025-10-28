@@ -30,38 +30,58 @@ interface Helpline {
 export default function SupportPage() {
   const { user, logout } = useAuth()
   const [helplines, setHelplines] = useState<Helpline[]>([])
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
   const [locationQuery, setLocationQuery] = useState("")
   const [selectedCountry, setSelectedCountry] = useState("US")
   const [selectedTopic, setSelectedTopic] = useState("All topics")
   const [detectedLocation, setDetectedLocation] = useState<string | null>(null)
+  const [isDetectingLocation, setIsDetectingLocation] = useState(false)
+  const [hasSearched, setHasSearched] = useState(false)
 
-  useEffect(() => {
-    loadHelplines()
-    detectLocation()
-  }, [selectedCountry])
-
-  const detectLocation = async () => {
+  const detectLocationAndSearch = async () => {
+    setIsDetectingLocation(true)
+    setLoading(true)
     try {
       // Try to get user's location from IP
       const response = await fetch("https://ipapi.co/json/")
       const data = await response.json()
-      if (data.city && data.region) {
-        setDetectedLocation(`${data.city}, ${data.region}`)
-        setLocationQuery(`${data.city}, ${data.region}`)
+
+      if (data.city && data.region && data.country_code) {
+        const location = `${data.city}, ${data.region}`
+        setDetectedLocation(location)
+        setLocationQuery(location)
+        setSelectedCountry(data.country_code)
+
+        // Load helplines for detected country
+        await loadHelplines(data.country_code)
+        setHasSearched(true)
+      } else {
+        // Fallback to US if detection fails
+        setSelectedCountry("US")
+        await loadHelplines("US")
+        setHasSearched(true)
       }
     } catch (error) {
       console.log("Could not detect location:", error)
+      // Fallback to US
+      setSelectedCountry("US")
+      await loadHelplines("US")
+      setHasSearched(true)
+    } finally {
+      setIsDetectingLocation(false)
+      setLoading(false)
     }
   }
 
-  const loadHelplines = async () => {
+  const loadHelplines = async (country?: string) => {
     setLoading(true)
     try {
-      const response = await fetch(`/api/support/helplines?country=${selectedCountry}`)
+      const countryCode = country || selectedCountry
+      const response = await fetch(`/api/support/helplines?country=${countryCode}`)
       const data = await response.json()
       setHelplines(data.helplines || [])
+      setHasSearched(true)
     } catch (error) {
       console.error("Failed to load helplines:", error)
     } finally {
@@ -127,72 +147,100 @@ export default function SupportPage() {
           </p>
         </div>
 
-        {/* Search and Filters */}
-        <Card className="glass-card mb-6">
-          <CardContent className="pt-6">
-            <div className="grid gap-4">
-              {/* Location Search - Primary */}
-              <div className="relative">
-                <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input
-                  placeholder="Enter your city, state, or zip code (e.g., Los Angeles, CA or 90210)"
-                  value={locationQuery}
-                  onChange={(e) => setLocationQuery(e.target.value)}
-                  className="pl-10 text-base"
-                />
-                {detectedLocation && !locationQuery && (
-                  <button
-                    onClick={() => setLocationQuery(detectedLocation)}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-xs text-primary hover:underline"
-                  >
-                    Use: {detectedLocation}
-                  </button>
-                )}
+        {/* Find Helplines Button */}
+        {!hasSearched ? (
+          <Card className="glass-card mb-6">
+            <CardContent className="pt-8 pb-8">
+              <div className="text-center space-y-4">
+                <div className="flex justify-center">
+                  <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
+                    <MapPin className="w-8 h-8 text-primary" />
+                  </div>
+                </div>
+                <div>
+                  <h3 className="text-xl font-semibold mb-2">Find Helplines in Your Area</h3>
+                  <p className="text-muted-foreground text-sm max-w-md mx-auto">
+                    We'll automatically detect your location and show you the most relevant mental health resources and crisis helplines near you.
+                  </p>
+                </div>
+                <Button
+                  size="lg"
+                  onClick={detectLocationAndSearch}
+                  disabled={isDetectingLocation}
+                  className="text-lg px-8 py-6 h-auto"
+                >
+                  {isDetectingLocation ? (
+                    <>
+                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-3" />
+                      Detecting Location...
+                    </>
+                  ) : (
+                    <>
+                      <MapPin className="mr-2 h-5 w-5" />
+                      Find Helplines Near Me
+                    </>
+                  )}
+                </Button>
+                <p className="text-xs text-muted-foreground">
+                  {detectedLocation && `Detected: ${detectedLocation}`}
+                </p>
               </div>
+            </CardContent>
+          </Card>
+        ) : (
+          <Card className="glass-card mb-6">
+            <CardContent className="pt-6">
+              <div className="grid gap-4">
+                {/* Location Display */}
+                <div className="flex items-center justify-between p-3 bg-primary/5 rounded-lg">
+                  <div className="flex items-center gap-2">
+                    <MapPin className="w-4 h-4 text-primary" />
+                    <span className="font-medium">
+                      {locationQuery || detectedLocation || "Location not detected"}
+                    </span>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setHasSearched(false)
+                      setHelplines([])
+                      setLocationQuery("")
+                    }}
+                  >
+                    Change Location
+                  </Button>
+                </div>
 
-              <div className="grid gap-4 md:grid-cols-3">
-                {/* Country Filter */}
-                <div className="relative">
+                <div className="grid gap-4 md:grid-cols-2">
+                  {/* Topic Filter */}
                   <select
-                    value={selectedCountry}
-                    onChange={(e) => setSelectedCountry(e.target.value)}
+                    value={selectedTopic}
+                    onChange={(e) => setSelectedTopic(e.target.value)}
                     className="w-full px-4 py-2 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                   >
-                    <option value="US">🇺🇸 United States</option>
-                    <option value="NZ">🇳🇿 New Zealand</option>
-                    <option value="GB">🇬🇧 United Kingdom</option>
-                    <option value="CA">🇨🇦 Canada</option>
-                    <option value="AU">🇦🇺 Australia</option>
+                    {topics.map((topic) => (
+                      <option key={topic} value={topic}>
+                        {topic}
+                      </option>
+                    ))}
                   </select>
-                </div>
 
-                {/* Topic Filter */}
-                <select
-                  value={selectedTopic}
-                  onChange={(e) => setSelectedTopic(e.target.value)}
-                  className="w-full px-4 py-2 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                >
-                  {topics.map((topic) => (
-                    <option key={topic} value={topic}>
-                      {topic}
-                    </option>
-                  ))}
-                </select>
-
-                {/* Search Helplines */}
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Search helplines..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-10"
-                  />
+                  {/* Search Helplines */}
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Search helplines..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="pl-10"
+                    />
+                  </div>
                 </div>
               </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Emergency Banner */}
         <Card className="mb-6 border-red-500/50 bg-red-500/10">
