@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import Image from "next/image"
 import { ThemeToggle } from "./theme-toggle"
 import { Button } from "./ui/button"
 import { Menu, Sparkles } from "lucide-react"
@@ -14,8 +15,14 @@ export function Navigation() {
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-center h-16 relative">
           {/* Logo - Left */}
-          <Link href="/" className="flex items-center gap-2 absolute left-0">
-            <div className="w-8 h-8 rounded-full gradient-primary animate-pulse-glow" />
+          <Link href="/" className="flex items-center gap-3 absolute left-0">
+            <Image
+              src="/airalogo2.png"
+              alt="Aira Logo"
+              width={48}
+              height={48}
+              className="w-12 h-12 object-contain"
+            />
             <span className="text-xl font-bold font-serif">Aira</span>
           </Link>
 
@@ -50,7 +57,7 @@ export function Navigation() {
             >
               <Link href="/signup" className="flex items-center gap-1.5">
                 <Sparkles className="h-4 w-4" />
-                Get Started
+                Try Aira Free
               </Link>
             </Button>
 
@@ -95,7 +102,7 @@ export function Navigation() {
                 >
                   <Link href="/signup" className="flex items-center justify-center gap-1.5">
                     <Sparkles className="h-4 w-4" />
-                    Get Started
+                    Try Aira Free
                   </Link>
                 </Button>
               </div>

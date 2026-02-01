@@ -1,0 +1,28 @@
+# Robots.txt for Aira - AI Emotional Support Companion
+# https://airasupport.com
+
+User-agent: *
+Allow: /
+
+# Disallow admin and API routes
+Disallow: /api/
+Disallow: /admin/
+Disallow: /_next/
+Disallow: /settings
+Disallow: /dashboard
+
+# Allow important pages
+Allow: /
+Allow: /about
+Allow: /pricing
+Allow: /blog
+Allow: /chat
+Allow: /login
+Allow: /signup
+Allow: /privacy
+Allow: /terms
+Allow: /support
+
+# Sitemap location
+Sitemap: https://airasupport.com/sitemap.xml
+

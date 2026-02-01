@@ -48,9 +48,9 @@ export default function MaintenancePage() {
           <p className="text-sm text-muted-foreground">
             Have questions? Reach out to us
           </p>
-          <a href="mailto:support@talkwithaira.com">
-            <Button 
-              variant="outline" 
+          <a href="mailto:airahelpdesk26@gmail.com">
+            <Button
+              variant="outline"
               className="w-full gap-2"
             >
               <Mail className="w-4 h-4" />

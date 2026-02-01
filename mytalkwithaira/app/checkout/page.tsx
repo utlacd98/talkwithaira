@@ -48,31 +48,37 @@ function CheckoutContent() {
     }
   }, [user, plan, currentPlan, router])
 
-  const handleCheckout = () => {
+  const handleCheckout = async () => {
     if (!user || !plan) return
 
     setLoading(true)
     setError(null)
 
     try {
-      // Get the Lemonsqueezy product ID based on plan
-      const productId =
-        plan === "plus"
-          ? process.env.NEXT_PUBLIC_LEMONSQUEEZY_PRODUCT_PLUS
-          : process.env.NEXT_PUBLIC_LEMONSQUEEZY_PRODUCT_PREMIUM
+      console.log("[Checkout] Creating Stripe checkout session for plan:", plan)
 
-      if (!productId) {
-        throw new Error("Product not configured")
+      const response = await fetch("/api/stripe/checkout-session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: user.email,
+          userId: user.id,
+          name: user.name,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to create checkout session")
       }
 
-      console.log("[Checkout] Redirecting to Lemonsqueezy for plan:", plan, "Product:", productId)
-
-      // Store the plan upgrade in localStorage before redirecting
-      localStorage.setItem("pending_plan_upgrade", plan)
-
-      // Redirect to Lemonsqueezy checkout with pre-filled email and name
-      const checkoutUrl = `https://talkwithaira.lemonsqueezy.com/buy/${productId}?checkout[email]=${encodeURIComponent(user.email)}&checkout[name]=${encodeURIComponent(user.name || "")}`
-      window.location.href = checkoutUrl
+      if (data.url) {
+        console.log("[Checkout] Redirecting to Stripe checkout")
+        window.location.href = data.url
+      } else {
+        throw new Error("No checkout URL returned")
+      }
     } catch (err) {
       console.error("[Checkout] Error:", err)
       setError(err instanceof Error ? err.message : "Checkout failed")

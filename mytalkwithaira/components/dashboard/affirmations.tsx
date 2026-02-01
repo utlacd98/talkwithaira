@@ -63,10 +63,26 @@ export function Affirmations({ userId, moodScore = 5 }: AffirmationsProps) {
     return affirmations[Math.floor(Math.random() * affirmations.length)]
   }
 
-  const refreshAffirmation = () => {
+  const refreshAffirmation = async () => {
     setIsRefreshing(true)
+    const newAffirmation = getRandomAffirmation()
+
+    // Track affirmation view in Supabase
+    try {
+      await fetch("/api/affirmations/track", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId,
+          affirmationText: newAffirmation,
+        }),
+      })
+    } catch (error) {
+      console.error("Error tracking affirmation view:", error)
+    }
+
     setTimeout(() => {
-      setAffirmation(getRandomAffirmation())
+      setAffirmation(newAffirmation)
       setIsRefreshing(false)
     }, 300)
   }
@@ -89,8 +105,19 @@ export function Affirmations({ userId, moodScore = 5 }: AffirmationsProps) {
   }
 
   useEffect(() => {
-    setAffirmation(getRandomAffirmation())
-  }, [moodScore])
+    const newAffirmation = getRandomAffirmation()
+    setAffirmation(newAffirmation)
+
+    // Track initial affirmation view
+    fetch("/api/affirmations/track", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        userId,
+        affirmationText: newAffirmation,
+      }),
+    }).catch(err => console.error("Error tracking affirmation view:", err))
+  }, [moodScore, userId])
 
   return (
     <Card className="glass-card border-primary/20">

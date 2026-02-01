@@ -3,8 +3,9 @@
 import { useAuth } from "@/lib/auth-context"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Sparkles, MessageSquare, TrendingUp, Heart, Settings, Crown, CheckCircle, Gamepad2, LifeBuoy, BookOpen } from "lucide-react"
+import { Sparkles, MessageSquare, TrendingUp, Heart, Settings, Crown, CheckCircle, Gamepad2, LifeBuoy, BookOpen, Brain } from "lucide-react"
 import Link from "next/link"
+import Image from "next/image"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { useSearchParams } from "next/navigation"
 import { useEffect, useState } from "react"
@@ -12,81 +13,111 @@ import { useDashboardStats } from "@/lib/hooks/useDashboardStats"
 import { MoodTracker } from "@/components/dashboard/mood-tracker"
 import { Affirmations } from "@/components/dashboard/affirmations"
 import { MoodInsights } from "@/components/dashboard/mood-insights"
+import { AnimatedBackground, HeaderGlow } from "@/components/dashboard/animated-background"
+import { EmotionTile } from "@/components/dashboard/emotion-tile"
+import { StreakSystem } from "@/components/dashboard/streak-system"
+import { DailyGoals } from "@/components/dashboard/daily-goals"
+import { EmotionalJourney } from "@/components/dashboard/emotional-journey"
+import { AiraRecommendation } from "@/components/dashboard/aira-recommendation"
+import { EmotionalGraph } from "@/components/dashboard/emotional-graph"
+import { HeartRateDivider } from "@/components/dashboard/heart-rate-divider"
+import { trackDashboardViewed, trackCheckoutCompleted, trackUpgradeClicked } from "@/lib/vercel-analytics"
 
 export function DashboardContent() {
-  const { user, logout, updateUserPlan } = useAuth()
+  const { user, logout, updateUserPlan, refreshUserPlan } = useAuth()
   const searchParams = useSearchParams()
   const [showUpgradeSuccess, setShowUpgradeSuccess] = useState(false)
   const { stats: dashboardStats, loading, error, refetch } = useDashboardStats(user?.id)
 
+  // Track dashboard view on mount
+  useEffect(() => {
+    trackDashboardViewed()
+  }, [])
+
   useEffect(() => {
     const sessionId = searchParams.get("session_id")
+    const upgraded = searchParams.get("upgraded")
 
-    if (sessionId && user) {
-      // Verify the Lemonsqueezy session and update user plan
-      const verifySession = async () => {
+    // Only run once when the component mounts with the query params
+    if (!user) return
+
+    if (sessionId) {
+      // Verify the Stripe payment and upgrade user
+      const verifyPayment = async () => {
         try {
-          console.log("[Dashboard] Verifying Lemonsqueezy session for email:", user.email)
-          const response = await fetch(`/api/stripe/verify-session?email=${encodeURIComponent(user.email)}&session_id=${sessionId}`)
-          const data = await response.json()
+          console.log("[Dashboard] ✅ Verifying Stripe payment for:", user.email)
+          console.log("[Dashboard] Session ID:", sessionId)
 
-          console.log("[Dashboard] Session verification result:", data)
+          const response = await fetch("/api/stripe/verify-payment", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              sessionId,
+              email: user.email,
+            }),
+          })
+
+          const data = await response.json()
+          console.log("[Dashboard] Payment verification result:", data)
 
           if (data.success && data.plan) {
-            console.log("[Dashboard] Updating user plan to:", data.plan)
+            console.log("[Dashboard] ✅ Payment verified! Upgrading to:", data.plan)
+            // Track successful checkout
+            trackCheckoutCompleted(data.plan, 2.99)
             // Update the user's plan in auth context
             updateUserPlan(data.plan)
             setShowUpgradeSuccess(true)
             setTimeout(() => setShowUpgradeSuccess(false), 5000)
+
+            // Remove query params from URL
+            window.history.replaceState({}, '', '/dashboard')
+          } else {
+            console.error("[Dashboard] ❌ Payment verification failed:", data.error)
           }
         } catch (err) {
-          console.error("[Dashboard] Error verifying session:", err)
+          console.error("[Dashboard] ❌ Error verifying payment:", err)
         }
       }
 
-      verifySession()
-    } else if (searchParams.get("upgraded") === "true") {
-      setShowUpgradeSuccess(true)
-      setTimeout(() => setShowUpgradeSuccess(false), 5000)
+      verifyPayment()
+    } else if (upgraded === "true") {
+      // User returned from Stripe payment, refresh their plan from Redis
+      console.log("[Dashboard] User returned from payment with ?upgraded=true")
+      console.log("[Dashboard] Current user plan:", user.plan)
+      console.log("[Dashboard] Calling refreshUserPlan()...")
+      refreshUserPlan().then(() => {
+        console.log("[Dashboard] refreshUserPlan() completed")
+        setShowUpgradeSuccess(true)
+        setTimeout(() => setShowUpgradeSuccess(false), 5000)
+      }).catch((err) => {
+        console.error("[Dashboard] Error refreshing plan:", err)
+      })
     }
-  }, [searchParams, updateUserPlan, user])
-
-  // Build stats array from real data
-  const stats = [
-    {
-      label: "Conversations",
-      value: dashboardStats?.conversations?.toString() || "0",
-      icon: MessageSquare,
-      color: "text-primary",
-    },
-    {
-      label: "Mood Score",
-      value: dashboardStats?.mood_score?.toFixed(1) || "0.0",
-      icon: TrendingUp,
-      color: "text-accent",
-    },
-    {
-      label: "Days Active",
-      value: dashboardStats?.days_active?.toString() || "0",
-      icon: Heart,
-      color: "text-primary",
-    },
-  ]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams])
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5">
+    <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5 relative">
+      {/* Animated Background */}
+      <AnimatedBackground />
+
       {/* Header */}
-      <header className="border-b border-border/50 backdrop-blur-sm bg-background/80 sticky top-0 z-10">
-        <div className="container mx-auto px-4 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center">
-              <Sparkles className="w-4 h-4 text-white" />
-            </div>
+      <header className="border-b border-border/50 backdrop-blur-sm bg-background/80 sticky top-0 z-10 relative">
+        <HeaderGlow />
+        <div className="container mx-auto px-4 h-16 flex items-center justify-between relative z-10">
+          <div className="flex items-center gap-3">
+            <Image
+              src="/airalogo2.png"
+              alt="Aira Logo"
+              width={40}
+              height={40}
+              className="w-10 h-10 object-contain"
+            />
             <h1 className="text-xl font-bold font-heading">Aira</h1>
           </div>
           <div className="flex items-center gap-2">
             <ThemeToggle />
-            <Button variant="ghost" size="sm" onClick={logout}>
+            <Button variant="ghost" size="sm" onClick={logout} className="neon-border-hover">
               Logout
             </Button>
           </div>
@@ -108,36 +139,68 @@ export function DashboardContent() {
           </div>
         )}
 
-        {/* Welcome Section */}
+        {/* Welcome Section with Aira's Voice */}
         <div className="mb-8">
-          <h2 className="text-3xl font-bold font-heading mb-2">Welcome back, {user?.name}!</h2>
-          <p className="text-muted-foreground">Here's how you're doing on your journey to emotional clarity.</p>
+          <h2 className="text-3xl font-bold font-heading mb-2 flex items-center gap-2">
+            Welcome back, {user?.name}!
+            {user?.plan === "premium" && (
+              <Crown className="w-6 h-6 text-yellow-500 fill-yellow-500 animate-pulse" />
+            )}
+            {user?.plan === "plus" && (
+              <Crown className="w-6 h-6 text-blue-500" />
+            )}
+          </h2>
+          <p className="text-muted-foreground mb-3">Here's how you're doing on your journey to emotional clarity.</p>
+
+          {/* Aira speaks to you */}
+          <div className="p-4 rounded-lg bg-gradient-to-r from-primary/10 via-accent/10 to-secondary/10 border border-primary/20">
+            <p className="text-sm leading-relaxed">
+              💚 I'm glad you're here today. I've missed talking with you. How can I support you right now?
+            </p>
+          </div>
         </div>
 
-        {/* Stats Grid */}
+        {/* Emotion Tiles (Enhanced Stats) */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-          {stats.map((stat) => (
-            <Card key={stat.label} className="glass-card">
-              <CardContent className="pt-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-muted-foreground mb-1">{stat.label}</p>
-                    <p className="text-3xl font-bold">{stat.value}</p>
-                  </div>
-                  <div
-                    className={`w-12 h-12 rounded-full bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center ${stat.color}`}
-                  >
-                    <stat.icon className="w-6 h-6" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+          <EmotionTile
+            label="Conversations"
+            value={dashboardStats?.conversations?.toString() || "0"}
+            icon={MessageSquare}
+            color="primary"
+            isAnimating={false}
+          />
+          <EmotionTile
+            label="Mood Score"
+            value={dashboardStats?.mood_score?.toFixed(1) || "0.0"}
+            icon={TrendingUp}
+            color="accent"
+            moodScore={dashboardStats?.mood_score}
+            isAnimating={false}
+          />
+          <EmotionTile
+            label="Days Active"
+            value={dashboardStats?.days_active?.toString() || "0"}
+            icon={Heart}
+            color="secondary"
+            isAnimating={false}
+          />
         </div>
+
+        <HeartRateDivider />
+
+        {/* Streak System & Daily Goals */}
+        {user?.id && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+            <StreakSystem userId={user.id} />
+            <DailyGoals userId={user.id} />
+          </div>
+        )}
+
+        <HeartRateDivider />
 
         {/* Quick Actions - Moved up for better visibility */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <Card className="glass-card">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <Card className="glass-card neon-border-hover">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <MessageSquare className="w-5 h-5 text-primary" />
@@ -147,12 +210,12 @@ export function DashboardContent() {
             </CardHeader>
             <CardContent>
               <Link href="/chat">
-                <Button className="w-full">Open Chat</Button>
+                <Button className="w-full neon-border-hover">Open Chat</Button>
               </Link>
             </CardContent>
           </Card>
 
-          <Card className="glass-card">
+          <Card className="glass-card neon-border-hover">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Gamepad2 className="w-5 h-5 text-accent" />
@@ -162,15 +225,30 @@ export function DashboardContent() {
             </CardHeader>
             <CardContent>
               <Link href="/games">
-                <Button className="w-full">Play Now</Button>
+                <Button className="w-full neon-border-hover">Play Now</Button>
               </Link>
             </CardContent>
           </Card>
 
-          <Card className="glass-card">
+          <Card className="glass-card neon-border-hover">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Crown className="w-5 h-5 text-accent" />
+                <Brain className="w-5 h-5 text-violet-500" />
+                ADHD Cognitive Games
+              </CardTitle>
+              <CardDescription>Focus training & cognitive support</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Link href="/adhd-games">
+                <Button className="w-full neon-border-hover bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700">Train Now</Button>
+              </Link>
+            </CardContent>
+          </Card>
+
+          <Card className="glass-card neon-border-hover">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Crown className={`w-5 h-5 ${user?.plan === "premium" ? "text-yellow-500 fill-yellow-500" : user?.plan === "plus" ? "text-blue-500" : "text-accent"}`} />
                 Your Plan: {user?.plan === "free" ? "Free Plan" : user?.plan === "plus" ? "Aira Plus" : "Aira Premium"}
               </CardTitle>
               <CardDescription>
@@ -178,14 +256,16 @@ export function DashboardContent() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <Link href="/pricing">
-                <Button variant={user?.plan === "free" ? "default" : "outline"} className="w-full">
+              <Link href="/pricing" onClick={() => user?.plan === "free" && trackUpgradeClicked('free', 'premium')}>
+                <Button variant={user?.plan === "free" ? "default" : "outline"} className="w-full neon-border-hover">
                   {user?.plan === "free" ? "Upgrade Plan" : "Manage Subscription"}
                 </Button>
               </Link>
             </CardContent>
           </Card>
         </div>
+
+        <HeartRateDivider />
 
         {/* Mood Tracker & Premium Features */}
         {user?.id && (
@@ -208,6 +288,38 @@ export function DashboardContent() {
             <MoodInsights userId={user.id} />
           </div>
         )}
+
+        <HeartRateDivider />
+
+        {/* Emotional Graph */}
+        {user?.id && (
+          <div className="mb-8">
+            <EmotionalGraph userId={user.id} />
+          </div>
+        )}
+
+        <HeartRateDivider />
+
+        {/* Emotional Journey Timeline */}
+        {user?.id && (
+          <div className="mb-8">
+            <EmotionalJourney userId={user.id} />
+          </div>
+        )}
+
+        <HeartRateDivider />
+
+        {/* Aira's Recommendation of the Day */}
+        {user?.id && (
+          <div className="mb-8">
+            <AiraRecommendation
+              userId={user.id}
+              moodScore={dashboardStats?.mood_score || 5}
+            />
+          </div>
+        )}
+
+        <HeartRateDivider />
 
         {/* Recent Activity */}
         <Card className="glass-card">

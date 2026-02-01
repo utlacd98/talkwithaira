@@ -1,27 +1,45 @@
 import { createClient } from "@supabase/supabase-js"
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+// Lazy initialization to avoid build-time errors
+let _supabase: ReturnType<typeof createClient> | null = null
+let _supabaseServer: ReturnType<typeof createClient> | null = null
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error("Missing Supabase environment variables")
+/**
+ * Get client-side Supabase client
+ * Uses anon key for browser-safe operations
+ */
+export function getSupabase() {
+  if (!_supabase) {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+    if (!supabaseUrl || !supabaseAnonKey) {
+      throw new Error("Missing Supabase environment variables")
+    }
+
+    _supabase = createClient(supabaseUrl, supabaseAnonKey)
+  }
+  return _supabase
 }
 
 /**
- * Client-side Supabase client
- * Uses anon key for browser-safe operations
- */
-export const supabase = createClient(supabaseUrl, supabaseAnonKey)
-
-/**
- * Server-side Supabase client
+ * Get server-side Supabase client
  * Uses service role key for privileged operations
  * Only use on server-side (API routes, server components)
  */
-export const supabaseServer = supabaseServiceRoleKey
-  ? createClient(supabaseUrl, supabaseServiceRoleKey)
-  : null
+export function getSupabaseServer() {
+  if (!_supabaseServer) {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+    if (!supabaseUrl || !supabaseServiceRoleKey) {
+      return null
+    }
+
+    _supabaseServer = createClient(supabaseUrl, supabaseServiceRoleKey)
+  }
+  return _supabaseServer
+}
 
 /**
  * Database Types
@@ -57,6 +75,7 @@ export interface Message {
  * Helper function to get current user
  */
 export async function getCurrentUser() {
+  const supabase = getSupabase()
   const {
     data: { user },
   } = await supabase.auth.getUser()
@@ -83,6 +102,7 @@ export async function isAuthenticated(): Promise<boolean> {
  * Helper function to sign out
  */
 export async function signOut() {
+  const supabase = getSupabase()
   const { error } = await supabase.auth.signOut()
   if (error) throw error
 }
@@ -91,6 +111,7 @@ export async function signOut() {
  * Helper function to get user profile
  */
 export async function getUserProfile(userId: string) {
+  const supabase = getSupabase()
   const { data, error } = await supabase
     .from("users")
     .select("*")
@@ -105,6 +126,7 @@ export async function getUserProfile(userId: string) {
  * Helper function to update user profile
  */
 export async function updateUserProfile(userId: string, updates: Partial<User>) {
+  const supabase = getSupabase()
   const { data, error } = await supabase
     .from("users")
     .update(updates)
@@ -120,6 +142,7 @@ export async function updateUserProfile(userId: string, updates: Partial<User>) 
  * Helper function to get user's conversations
  */
 export async function getUserConversations(userId: string) {
+  const supabase = getSupabase()
   const { data, error } = await supabase
     .from("conversations")
     .select("*")
@@ -134,6 +157,7 @@ export async function getUserConversations(userId: string) {
  * Helper function to get specific conversation
  */
 export async function getConversation(conversationId: string) {
+  const supabase = getSupabase()
   const { data, error } = await supabase
     .from("conversations")
     .select("*")
@@ -148,6 +172,7 @@ export async function getConversation(conversationId: string) {
  * Helper function to get conversation messages
  */
 export async function getConversationMessages(conversationId: string) {
+  const supabase = getSupabase()
   const { data, error } = await supabase
     .from("messages")
     .select("*")
@@ -168,6 +193,7 @@ export async function saveConversation(
   messages: Message[],
   tags: string[] = []
 ) {
+  const supabaseServer = getSupabaseServer()
   if (!supabaseServer) {
     throw new Error("Supabase server client not initialized")
   }
@@ -208,6 +234,7 @@ export async function saveConversation(
  * Helper function to delete conversation
  */
 export async function deleteConversation(conversationId: string) {
+  const supabaseServer = getSupabaseServer()
   if (!supabaseServer) {
     throw new Error("Supabase server client not initialized")
   }
@@ -227,6 +254,7 @@ export async function updateConversation(
   conversationId: string,
   updates: Partial<Conversation>
 ) {
+  const supabaseServer = getSupabaseServer()
   if (!supabaseServer) {
     throw new Error("Supabase server client not initialized")
   }

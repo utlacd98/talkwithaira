@@ -21,7 +21,7 @@ const RETRY_CONFIG = {
 /**
  * Execute Redis operation with retry logic
  */
-async function executeWithRetry<T>(
+export async function executeWithRetry<T>(
   operation: () => Promise<T>,
   operationName: string,
   retries = 0
@@ -125,11 +125,29 @@ export async function getUserStats(userId: string): Promise<UserStats | null> {
       return null
     }
 
+    // Safely parse recent_conversations
+    let recentConversations = []
+    try {
+      const recentConvStr = stats.recent_conversations
+      if (typeof recentConvStr === 'string') {
+        const trimmed = recentConvStr.trim()
+        if (trimmed) {
+          recentConversations = JSON.parse(trimmed)
+        }
+      } else if (Array.isArray(recentConvStr)) {
+        // Already an array
+        recentConversations = recentConvStr
+      }
+    } catch (parseError) {
+      console.error("[Redis] Error parsing recent_conversations:", parseError, "Type:", typeof stats.recent_conversations)
+      recentConversations = []
+    }
+
     return {
       conversations: parseInt(stats.conversations as string) || 0,
       mood_score: parseFloat(stats.mood_score as string) || 0,
       days_active: parseInt(stats.days_active as string) || 0,
-      recent_conversations: JSON.parse((stats.recent_conversations as string) || "[]"),
+      recent_conversations: recentConversations,
       plan: (stats.plan as "Free" | "Plus" | "Premium") || "Free",
     }
   } catch (error) {
@@ -355,7 +373,27 @@ export async function getMoodHistory(
       return []
     }
 
-    return entries.map((entry) => JSON.parse(entry as string) as MoodEntry)
+    // Safely parse each entry
+    return entries
+      .map((entry) => {
+        try {
+          // Handle different types of entries
+          if (typeof entry === 'string') {
+            const trimmed = entry.trim()
+            if (trimmed) {
+              return JSON.parse(trimmed) as MoodEntry
+            }
+          } else if (typeof entry === 'object' && entry !== null) {
+            // Entry is already an object
+            return entry as MoodEntry
+          }
+          return null
+        } catch (parseError) {
+          console.error("[Redis] Error parsing mood entry:", parseError, "Entry type:", typeof entry)
+          return null
+        }
+      })
+      .filter((entry): entry is MoodEntry => entry !== null)
   } catch (error) {
     console.error("[Redis] Error getting mood history:", error)
     return []

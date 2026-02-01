@@ -27,11 +27,38 @@ export async function registerUser(
   plan: "free" | "plus" | "premium" = "free"
 ): Promise<void> {
   try {
+    console.log("[User Profile Registry] Starting registration for:", email)
+
+    // Check if KV is available
+    if (!kv) {
+      throw new Error("Redis KV is not initialized. Check KV_REST_API_URL and KV_REST_API_TOKEN environment variables.")
+    }
+
     const normalizedEmail = email.toLowerCase()
     const now = new Date().toISOString()
-
-    // Store user profile
     const profileKey = `user:${userId}:profile`
+
+    console.log("[User Profile Registry] Checking if user exists with key:", profileKey)
+
+    // Check if user already exists
+    let existingProfile: any = null
+    try {
+      existingProfile = await kv.hgetall(profileKey)
+      console.log("[User Profile Registry] Existing profile check result:", existingProfile)
+    } catch (checkError) {
+      console.error("[User Profile Registry] Error checking existing profile:", checkError)
+      // Continue with registration even if check fails
+    }
+
+    if (existingProfile && Object.keys(existingProfile).length > 0) {
+      // User exists - preserve their plan and joinedAt, but update name if needed
+      console.log("[User Profile Registry] User already exists:", normalizedEmail, "Preserving plan:", existingProfile.plan)
+      await kv.hset(profileKey, { name }) // Only update name
+      return
+    }
+
+    // New user - create full profile
+    console.log("[User Profile Registry] Creating new user profile...")
     const profile: UserProfile = {
       id: userId,
       email: normalizedEmail,
@@ -40,15 +67,21 @@ export async function registerUser(
       joinedAt: now,
     }
 
+    console.log("[User Profile Registry] Writing profile to Redis:", profile)
     await kv.hset(profileKey, profile)
+    console.log("[User Profile Registry] ✅ Profile written successfully")
 
     // Create reverse lookup for email -> userId
     const emailKey = `email:${normalizedEmail}:userId`
+    console.log("[User Profile Registry] Creating email lookup:", emailKey, "->", userId)
     await kv.set(emailKey, userId)
+    console.log("[User Profile Registry] ✅ Email lookup created successfully")
 
-    console.log("[User Profile Registry] Registered user:", normalizedEmail, "ID:", userId)
-  } catch (error) {
-    console.error("[User Profile Registry] Error registering user:", error)
+    console.log("[User Profile Registry] ✅ Registered new user:", normalizedEmail, "ID:", userId, "Plan:", plan)
+  } catch (error: any) {
+    console.error("[User Profile Registry] ❌ Error registering user:", error)
+    console.error("[User Profile Registry] Error message:", error.message)
+    console.error("[User Profile Registry] Error stack:", error.stack)
     throw error
   }
 }
@@ -144,24 +177,39 @@ export async function updateUserPlanByEmail(
   plan: "free" | "plus" | "premium"
 ): Promise<boolean> {
   try {
+    console.log("[User Profile Registry] ========================================")
+    console.log("[User Profile Registry] Updating plan for email:", email)
+    console.log("[User Profile Registry] New plan:", plan)
+
     const normalizedEmail = email.toLowerCase()
     const emailKey = `email:${normalizedEmail}:userId`
+    console.log("[User Profile Registry] Looking up userId with key:", emailKey)
 
     // Get userId from email lookup
     const userId = await kv.get(emailKey)
+    console.log("[User Profile Registry] Found userId:", userId)
 
     if (!userId) {
-      console.warn("[User Profile Registry] User not found for email:", normalizedEmail)
+      console.warn("[User Profile Registry] ❌ User not found for email:", normalizedEmail)
+      console.warn("[User Profile Registry] This means the user was never registered in Redis!")
       return false
     }
 
     // Update plan in user profile
     const profileKey = `user:${userId}:profile`
+    console.log("[User Profile Registry] Updating profile with key:", profileKey)
+
     await kv.hset(profileKey, { plan })
-    console.log("[User Profile Registry] Updated plan for", normalizedEmail, "to", plan)
+
+    // Verify the update
+    const updatedProfile = await kv.hgetall(profileKey)
+    console.log("[User Profile Registry] Updated profile:", updatedProfile)
+    console.log("[User Profile Registry] ✅ Successfully updated plan for", normalizedEmail, "to", plan)
+    console.log("[User Profile Registry] ========================================")
     return true
   } catch (error) {
-    console.error("[User Profile Registry] Error updating user plan by email:", error)
+    console.error("[User Profile Registry] ❌ Error updating user plan by email:", error)
+    console.log("[User Profile Registry] ========================================")
     return false
   }
 }

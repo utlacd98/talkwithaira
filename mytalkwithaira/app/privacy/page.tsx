@@ -98,8 +98,15 @@ export default function PrivacyPage() {
           <section>
             <h2 className="text-2xl font-semibold mb-4">9. Contact Us</h2>
             <p className="text-muted-foreground leading-relaxed">
-              If you have any questions about this Privacy Policy or how we handle your data, please contact us at
-              privacy@aira.app
+              If you have any questions about this Privacy Policy or how we handle your data, please contact us at{" "}
+              <a href="mailto:airahelpdesk26@gmail.com" className="text-primary hover:underline">
+                airahelpdesk26@gmail.com
+              </a>{" "}
+              or call us at{" "}
+              <a href="tel:07366387613" className="text-primary hover:underline">
+                07366 387613
+              </a>
+              .
             </p>
           </section>
 

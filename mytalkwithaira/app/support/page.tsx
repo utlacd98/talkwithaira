@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Sparkles, ArrowLeft, Phone, MessageSquare, Globe, Heart, Search, MapPin, Loader2, ExternalLink } from "lucide-react"
 import Link from "next/link"
 import { ThemeToggle } from "@/components/theme-toggle"
+import { trackSupportResourceViewed, trackHelplineClicked } from "@/lib/vercel-analytics"
 
 interface Helpline {
   id: string
@@ -38,6 +39,11 @@ export default function SupportPage() {
   const [detectedLocation, setDetectedLocation] = useState<string | null>(null)
   const [isDetectingLocation, setIsDetectingLocation] = useState(false)
   const [hasSearched, setHasSearched] = useState(false)
+
+  // Track support page view
+  useEffect(() => {
+    trackSupportResourceViewed('support-page')
+  }, [])
 
   const detectLocationAndSearch = async () => {
     setIsDetectingLocation(true)
@@ -321,7 +327,7 @@ export default function SupportPage() {
                   <div className="flex flex-wrap gap-2">
                     {helpline.phone_number && (
                       <Button variant="default" size="sm" asChild>
-                        <a href={`tel:${helpline.phone_number}`}>
+                        <a href={`tel:${helpline.phone_number}`} onClick={() => trackHelplineClicked(helpline.name)}>
                           <Phone className="w-4 h-4 mr-2" />
                           Call
                         </a>
@@ -329,7 +335,7 @@ export default function SupportPage() {
                     )}
                     {helpline.sms_number && (
                       <Button variant="outline" size="sm" asChild>
-                        <a href={`sms:${helpline.sms_number}`}>
+                        <a href={`sms:${helpline.sms_number}`} onClick={() => trackHelplineClicked(helpline.name)}>
                           <MessageSquare className="w-4 h-4 mr-2" />
                           Text
                         </a>
@@ -337,7 +343,7 @@ export default function SupportPage() {
                     )}
                     {helpline.chat_url && (
                       <Button variant="outline" size="sm" asChild>
-                        <a href={helpline.chat_url} target="_blank" rel="noopener noreferrer">
+                        <a href={helpline.chat_url} target="_blank" rel="noopener noreferrer" onClick={() => trackHelplineClicked(helpline.name)}>
                           <MessageSquare className="w-4 h-4 mr-2" />
                           Chat
                         </a>
@@ -345,7 +351,7 @@ export default function SupportPage() {
                     )}
                     {helpline.url && (
                       <Button variant="ghost" size="sm" asChild>
-                        <a href={helpline.url} target="_blank" rel="noopener noreferrer">
+                        <a href={helpline.url} target="_blank" rel="noopener noreferrer" onClick={() => trackHelplineClicked(helpline.name)}>
                           <Globe className="w-4 h-4 mr-2" />
                           Website
                           <ExternalLink className="w-3 h-3 ml-1" />

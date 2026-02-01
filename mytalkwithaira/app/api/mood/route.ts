@@ -1,6 +1,6 @@
 /**
  * PATCH /api/mood
- * Updates mood_score in Redis and adds to mood history
+ * Updates mood_score in Redis and Supabase, adds to mood history
  *
  * GET /api/mood
  * Gets mood history and statistics
@@ -8,6 +8,7 @@
 
 import { NextRequest, NextResponse } from "next/server"
 import { addMoodEntry, getMoodHistory, getMoodStats, getUserStats } from "@/lib/redis"
+import { createClient } from "@/lib/supabase-server"
 
 export async function PATCH(req: NextRequest) {
   try {
@@ -33,8 +34,30 @@ export async function PATCH(req: NextRequest) {
 
     console.log("[Mood API] Adding mood entry for user:", userId, "Score:", score)
 
-    // Add mood entry (this also updates the current mood score)
+    // Add mood entry to Redis (this also updates the current mood score)
     await addMoodEntry(userId, score, note)
+
+    // Also save to Supabase for persistence and dashboard features
+    try {
+      const supabase = await createClient()
+      const { error } = await supabase
+        .from("mood_entries")
+        .insert({
+          user_id: userId,
+          score: score,
+          note: note || null,
+        })
+
+      if (error) {
+        console.error("[Mood API] Error saving to Supabase:", error)
+        // Don't fail the request if Supabase save fails - Redis is primary
+      } else {
+        console.log("[Mood API] Successfully saved to Supabase")
+      }
+    } catch (supabaseError) {
+      console.error("[Mood API] Supabase error:", supabaseError)
+      // Continue - Redis save was successful
+    }
 
     const updatedStats = await getUserStats(userId)
 

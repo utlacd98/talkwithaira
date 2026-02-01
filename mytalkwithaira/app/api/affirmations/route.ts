@@ -7,9 +7,12 @@ import { NextRequest, NextResponse } from "next/server"
 import { getMoodHistory, getMoodStats } from "@/lib/redis"
 import OpenAI from "openai"
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-})
+// Lazy initialization of OpenAI client to avoid build-time errors
+function getOpenAIClient() {
+  return new OpenAI({
+    apiKey: process.env.OPENAI_API_KEY,
+  })
+}
 
 export async function GET(req: NextRequest) {
   try {
@@ -108,6 +111,7 @@ Guidelines:
 
 Generate the affirmation:`
 
+    const openai = getOpenAIClient()
     const response = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [

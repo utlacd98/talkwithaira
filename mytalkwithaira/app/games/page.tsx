@@ -12,6 +12,7 @@ import { ArrowLeft, Gamepad2, Zap, Heart, Brain, Trophy, Flame, Wind } from "luc
 import Link from "next/link"
 import { useState, useEffect } from "react"
 import { ThemeToggle } from "@/components/theme-toggle"
+import { trackGamePlayed, trackFeatureUsed } from "@/lib/vercel-analytics"
 
 type GameType = "tictactoe" | "memory" | "breather" | "mood-matcher" | null
 
@@ -319,7 +320,12 @@ export default function GamesPage() {
                   className={`glass-card overflow-hidden transition-all duration-300 ${
                     isAvailable ? "hover:shadow-lg hover:scale-105 cursor-pointer" : "opacity-60"
                   }`}
-                  onClick={() => isAvailable && setSelectedGame(game.id as GameType)}
+                  onClick={() => {
+                    if (isAvailable) {
+                      trackGamePlayed(game.id, 0)
+                      setSelectedGame(game.id as GameType)
+                    }
+                  }}
                 >
                   {/* Gradient Background */}
                   <div className={`h-24 bg-gradient-to-r ${game.color} opacity-20`} />

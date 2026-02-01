@@ -3,6 +3,25 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* Neon glow animations and effects */
+@keyframes neon-pulse {
+  0%, 100% {
+    box-shadow: 0 0 5px var(--primary), 0 0 10px var(--primary), 0 0 15px var(--primary);
+  }
+  50% {
+    box-shadow: 0 0 10px var(--primary), 0 0 20px var(--primary), 0 0 30px var(--primary);
+  }
+}
+
+@keyframes bounce {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
 :root {
   /* Enhanced color palette with vibrant gradients and cosmic theme */
   --background: oklch(0.99 0.005 264);
@@ -289,6 +308,23 @@
     }
   }
 
+  .animate-float {
+    animation: float 3s ease-in-out infinite;
+  }
+
+  /* Animation delays */
+  .delay-300 {
+    animation-delay: 300ms;
+  }
+
+  .delay-1000 {
+    animation-delay: 1000ms;
+  }
+
+  .delay-2000 {
+    animation-delay: 2000ms;
+  }
+
   /* Pulse glow animation */
   .pulse-glow {
     animation: pulse-glow 3s ease-in-out infinite;
@@ -302,5 +338,48 @@
     50% {
       box-shadow: 0 0 40px rgba(58, 207, 133, 0.5), 0 0 80px rgba(157, 78, 221, 0.4);
     }
+  }
+
+  /* Neon border hover effects for buttons and cards */
+  .neon-border-hover {
+    position: relative;
+    transition: all 150ms ease-in-out;
+  }
+
+  .neon-border-hover:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 0 15px rgba(58, 207, 133, 0.4),
+                0 0 30px rgba(58, 207, 133, 0.2),
+                0 4px 12px rgba(0, 0, 0, 0.1);
+  }
+
+  .neon-border-hover:hover::before {
+    content: '';
+    position: absolute;
+    inset: -2px;
+    border-radius: inherit;
+    background: linear-gradient(45deg, var(--primary), var(--accent), var(--secondary));
+    opacity: 0.3;
+    z-index: -1;
+    filter: blur(8px);
+  }
+
+  /* Scrollbar styling */
+  .scrollbar-thin::-webkit-scrollbar {
+    height: 6px;
+    width: 6px;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background: rgba(58, 207, 133, 0.2);
+    border-radius: 3px;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    background: rgba(58, 207, 133, 0.4);
   }
 }

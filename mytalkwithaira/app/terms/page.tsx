@@ -79,7 +79,15 @@ export default function TermsPage() {
           <section>
             <h2 className="text-2xl font-semibold mb-4">8. Contact</h2>
             <p className="text-muted-foreground leading-relaxed">
-              If you have any questions about these Terms of Service, please contact us at support@aira.app
+              If you have any questions about these Terms of Service, please contact us at{" "}
+              <a href="mailto:airahelpdesk26@gmail.com" className="text-primary hover:underline">
+                airahelpdesk26@gmail.com
+              </a>{" "}
+              or call us at{" "}
+              <a href="tel:07366387613" className="text-primary hover:underline">
+                07366 387613
+              </a>
+              .
             </p>
           </section>
 

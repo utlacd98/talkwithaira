@@ -5,7 +5,8 @@ import { Card } from "@/components/ui/card"
 import { Check } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
 import { useRouter } from "next/navigation"
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { trackPricingViewed, trackPlanSelected, trackCheckoutStarted, trackError } from "@/lib/vercel-analytics"
 
 const plans = [
   {
@@ -14,7 +15,7 @@ const plans = [
     period: "forever",
     description: "Perfect for trying out Aira",
     features: [
-      "10 chats/day",
+      "5 messages/day",
       "Basic mood tracker",
       "Basic AI responses",
       "Mini games",
@@ -25,9 +26,9 @@ const plans = [
   },
   {
     name: "Aira Premium",
-    price: "£8.99",
-    period: "per month",
-    description: "Everything you need for mental wellness",
+    price: "£2.99",
+    period: "month",
+    description: "Unlimited access to all premium features",
     features: [
       "Unlimited chats with Aira",
       "Advanced mood tracking & history",
@@ -39,8 +40,9 @@ const plans = [
       "Dark mode",
       "Priority support",
       "Early access to new features",
+      "Cancel anytime",
     ],
-    cta: "Upgrade to Premium",
+    cta: "Subscribe Now",
     planId: "premium",
     highlighted: true,
   },
@@ -51,9 +53,22 @@ export default function PricingPage() {
   const router = useRouter()
   const [loading, setLoading] = useState<string | null>(null)
 
+  // Track pricing page view
+  useEffect(() => {
+    trackPricingViewed()
+  }, [])
+
   const handleSelectPlan = async (planId: string) => {
+    // Track plan selection
+    trackPlanSelected(planId as 'free' | 'plus' | 'premium')
+
+    // If user not logged in, redirect to appropriate signup page
     if (!user) {
-      router.push("/signup")
+      if (planId === "premium") {
+        router.push("/signup/premium")
+      } else {
+        router.push("/signup")
+      }
       return
     }
 
@@ -71,13 +86,17 @@ export default function PricingPage() {
       return
     }
 
-    // For Premium plan, redirect to Stripe checkout
+    // For Premium plan, redirect to Stripe Payment Link
     if (planId === "premium") {
       setLoading(planId)
+
+      // Track checkout started
+      trackCheckoutStarted('premium', 2.99)
 
       try {
         console.log("[Pricing] Creating Stripe checkout session for:", user.email)
 
+        // Create a Stripe Checkout Session via API
         const response = await fetch("/api/stripe/checkout-session", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -88,21 +107,24 @@ export default function PricingPage() {
           }),
         })
 
-        const data = await response.json()
-
         if (!response.ok) {
-          throw new Error(data.error || "Failed to create checkout session")
+          const error = await response.json()
+          throw new Error(error.error || "Failed to create checkout session")
         }
 
-        if (data.url) {
+        const { url } = await response.json()
+
+        if (url) {
           console.log("[Pricing] Redirecting to Stripe checkout")
-          window.location.href = data.url
+          window.location.href = url
         } else {
           throw new Error("No checkout URL returned")
         }
       } catch (error) {
         console.error("[Pricing] Checkout error:", error)
-        alert(error instanceof Error ? error.message : "Failed to start checkout. Please try again.")
+        const errorMessage = error instanceof Error ? error.message : "Failed to start checkout"
+        trackError('checkout', errorMessage)
+        alert(errorMessage + ". Please try again.")
         setLoading(null)
       }
       return
@@ -143,7 +165,7 @@ export default function PricingPage() {
               <div className="space-y-6">
                 {/* Plan Header */}
                 <div>
-                  <h3 className="text-2xl font-bold mb-2">{plan.name}</h3>
+                  <p className="text-2xl font-bold mb-2">{plan.name}</p>
                   <p className="text-muted-foreground text-sm">{plan.description}</p>
                 </div>
 
@@ -188,21 +210,27 @@ export default function PricingPage() {
           <h2 className="text-3xl font-bold text-center mb-12">Frequently Asked Questions</h2>
           <div className="space-y-6">
             <div className="glass-card p-6 rounded-lg">
-              <h3 className="font-semibold mb-2">Can I change plans anytime?</h3>
+              <p className="font-semibold mb-2">Can I cancel anytime?</p>
               <p className="text-muted-foreground text-sm">
-                Yes, you can upgrade or downgrade your plan at any time. Changes take effect immediately.
+                Yes! You can cancel your subscription anytime. You'll keep access until the end of your billing period.
               </p>
             </div>
             <div className="glass-card p-6 rounded-lg">
-              <h3 className="font-semibold mb-2">Is there a free trial?</h3>
+              <p className="font-semibold mb-2">Is there a free trial?</p>
               <p className="text-muted-foreground text-sm">
-                The Free plan is available forever with no credit card required. Upgrade when you're ready.
+                The Free plan gives you 5 messages per day - forever, with no credit card required. Try it out and upgrade when you're ready.
               </p>
             </div>
             <div className="glass-card p-6 rounded-lg">
-              <h3 className="font-semibold mb-2">What payment methods do you accept?</h3>
+              <p className="font-semibold mb-2">What payment methods do you accept?</p>
               <p className="text-muted-foreground text-sm">
                 We accept all major credit cards, debit cards, and digital payment methods through Stripe.
+              </p>
+            </div>
+            <div className="glass-card p-6 rounded-lg">
+              <p className="font-semibold mb-2">What happens if I cancel?</p>
+              <p className="text-muted-foreground text-sm">
+                You'll revert to the Free plan with 5 messages per day. Your conversation history stays safe.
               </p>
             </div>
           </div>

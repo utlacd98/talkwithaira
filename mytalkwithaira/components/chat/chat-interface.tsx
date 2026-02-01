@@ -6,12 +6,15 @@ import { useState, useRef, useEffect } from "react"
 import { useAuth } from "@/lib/auth-context"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
-import { Send, Sparkles, Menu, Save, Trash2, History, LifeBuoy } from "lucide-react"
+import { Send, Sparkles, Menu, Save, Trash2, History, LifeBuoy, MoreVertical, Mic } from "lucide-react"
 import { ChatMessage } from "./chat-message"
-import { EmotionRing } from "./emotion-ring"
 import { ChatSidebar, type ChatSidebarHandle } from "./chat-sidebar"
+import { UsageIndicator } from "./usage-indicator"
+import { VoiceModeOverlay } from "@/components/voice-mode-overlay"
 import Link from "next/link"
+import Image from "next/image"
 import { saveChat, loadChat } from "@/lib/chat-utils"
+import { trackChatStarted, trackMessageSent, trackVoiceModeStarted, trackVoiceModeEnded, trackError } from "@/lib/vercel-analytics"
 
 interface Message {
   id: string
@@ -39,6 +42,9 @@ export function ChatInterface() {
   const [currentEmotion, setCurrentEmotion] = useState<"calm" | "empathetic" | "supportive" | "reflective">("calm")
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [currentChatTitle, setCurrentChatTitle] = useState<string | null>(null)
+  const [usageRefreshTrigger, setUsageRefreshTrigger] = useState(0) // Add trigger for usage refresh
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [voiceModeOpen, setVoiceModeOpen] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const sidebarRef = useRef<ChatSidebarHandle>(null)
   const { user, logout } = useAuth()
@@ -50,6 +56,21 @@ export function ChatInterface() {
   useEffect(() => {
     scrollToBottom()
   }, [messages])
+
+  // Close mobile menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (mobileMenuOpen) {
+        const target = event.target as HTMLElement
+        if (!target.closest('.mobile-menu-container')) {
+          setMobileMenuOpen(false)
+        }
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [mobileMenuOpen])
 
   const detectEmotion = (text: string): "calm" | "empathetic" | "supportive" | "reflective" => {
     const lowerText = text.toLowerCase()
@@ -69,10 +90,20 @@ export function ChatInterface() {
     e.preventDefault()
     if (!input.trim() || isLoading) return
 
+    const messageContent = input.trim()
+
+    // Track message sent with length
+    trackMessageSent(messageContent.length)
+
+    // Track chat started if this is the first user message
+    if (messages.length === 1) {
+      trackChatStarted()
+    }
+
     const userMessage: Message = {
       id: Date.now().toString(),
       role: "user",
-      content: input.trim(),
+      content: messageContent,
       timestamp: new Date(),
     }
 
@@ -84,6 +115,7 @@ export function ChatInterface() {
     setCurrentEmotion(emotion)
 
     try {
+      console.log("[Chat Interface] Sending message for user:", user?.id)
       const response = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -92,10 +124,30 @@ export function ChatInterface() {
             role: m.role,
             content: m.content,
           })),
+          userId: user?.id,
         }),
       })
 
       const data = await response.json()
+
+      // Check if user hit daily limit
+      if (response.status === 429) {
+        console.log("[Chat Interface] User hit daily limit")
+        const limitMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          role: "assistant",
+          content: data.message || "You've reached your daily chat limit. Upgrade to Premium for unlimited chats!",
+          emotion: "empathetic",
+          timestamp: new Date(),
+        }
+        setMessages((prev) => [...prev, limitMessage])
+        setIsLoading(false)
+        return
+      }
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to send message")
+      }
 
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
@@ -106,16 +158,26 @@ export function ChatInterface() {
       }
 
       setMessages((prev) => [...prev, assistantMessage])
+
+      // Trigger usage refresh after successful message
+      console.log("[Chat Interface] Message sent successfully, triggering usage refresh")
+      setUsageRefreshTrigger(prev => {
+        const newValue = prev + 1
+        console.log("[Chat Interface] Usage refresh trigger:", prev, "->", newValue)
+        return newValue
+      })
     } catch (error) {
       console.error("[v0] Chat error:", error)
-      const errorMessage: Message = {
+      const errorMessage = error instanceof Error ? error.message : "Chat error"
+      trackError('chat', errorMessage)
+      const errorMsg: Message = {
         id: (Date.now() + 1).toString(),
         role: "assistant",
         content: "I'm having trouble connecting right now. Please try again in a moment.",
         emotion: "empathetic",
         timestamp: new Date(),
       }
-      setMessages((prev) => [...prev, errorMessage])
+      setMessages((prev) => [...prev, errorMsg])
     } finally {
       setIsLoading(false)
     }
@@ -163,6 +225,95 @@ export function ChatInterface() {
     }
   }
 
+  const handleVoiceTranscript = (transcript: string) => {
+    console.log("[Chat Interface] ✅ Voice transcript received:", transcript)
+
+    // Add user message to chat
+    const userMessage: Message = {
+      id: Date.now().toString(),
+      role: "user",
+      content: transcript.trim(),
+      timestamp: new Date(),
+    }
+
+    setMessages((prev) => [...prev, userMessage])
+  }
+
+  const handleVoiceSendMessage = async (message: string): Promise<string> => {
+    console.log("[Chat Interface] 💬 Voice Mode requesting Aira response...")
+
+    const userMessage: Message = {
+      id: Date.now().toString(),
+      role: "user",
+      content: message.trim(),
+      timestamp: new Date(),
+    }
+
+    const emotion = detectEmotion(message)
+    setCurrentEmotion(emotion)
+
+    try {
+      console.log("[Chat Interface] Sending to API with voice mode flag...")
+      const response = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messages: [...messages, userMessage].map((m) => ({
+            role: m.role,
+            content: m.content,
+          })),
+          userId: user?.id,
+          isVoiceMode: true, // Flag for voice-optimized responses
+        }),
+      })
+
+      const data = await response.json()
+
+      if (response.status === 429) {
+        const limitMessage = data.message || "You've reached your daily chat limit. Upgrade to Premium for unlimited chats!"
+        const assistantMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          role: "assistant",
+          content: limitMessage,
+          emotion: "empathetic",
+          timestamp: new Date(),
+        }
+        setMessages((prev) => [...prev, assistantMessage])
+        return limitMessage
+      }
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to send message")
+      }
+
+      const assistantMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        role: "assistant",
+        content: data.message,
+        emotion,
+        timestamp: new Date(),
+      }
+
+      setMessages((prev) => [...prev, assistantMessage])
+      setUsageRefreshTrigger(prev => prev + 1)
+      console.log("[Chat Interface] ✅ Aira responded successfully")
+
+      return data.message
+    } catch (error) {
+      console.error("[Chat Interface] Voice message error:", error)
+      const errorMsg = "I'm having trouble connecting right now. Please try again in a moment."
+      const errorMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        role: "assistant",
+        content: errorMsg,
+        emotion: "empathetic",
+        timestamp: new Date(),
+      }
+      setMessages((prev) => [...prev, errorMessage])
+      return errorMsg
+    }
+  }
+
   const handleSelectChat = async (chatId: string, title: string) => {
     // Prevent multiple clicks while loading
     if (isLoadingChat) {
@@ -206,69 +357,133 @@ export function ChatInterface() {
       />
 
       {/* Header */}
-      <header className="border-b border-border/50 backdrop-blur-sm bg-background/80 sticky top-0 z-10">
-        <div className="container mx-auto px-4 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-3">
+      <header className="w-full flex flex-col bg-background border-b border-border/50 sticky top-0 z-10 backdrop-blur-sm">
+        {/* Row 1: Main Navigation */}
+        <div className="flex items-center justify-between px-4 py-3 min-h-[60px]">
+          {/* Left: Menu Button */}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            title="Recent chats"
+            className="h-10 w-10 flex-shrink-0"
+          >
+            <Menu className="w-6 h-6" />
+          </Button>
+
+          {/* Center: Aira Logo + Name */}
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <Image
+              src="/airalogo2.png"
+              alt="Aira Logo"
+              width={28}
+              height={28}
+              className="w-7 h-7 object-contain"
+            />
+            <h1 className="font-semibold text-lg">Aira</h1>
+          </div>
+
+          {/* Right: User Menu */}
+          <div className="flex items-center gap-1 flex-shrink-0">
+            {/* Desktop Actions */}
+            <Link href="/support" className="hidden md:inline-block">
+              <Button
+                variant="ghost"
+                size="icon"
+                title="Support Resources"
+                className="h-10 w-10"
+              >
+                <LifeBuoy className="w-5 h-5" />
+              </Button>
+            </Link>
+
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => setSidebarOpen(!sidebarOpen)}
-              title="Recent chats"
-            >
-              <History className="w-5 h-5" />
-            </Button>
-            <Link href="/dashboard">
-              <Button variant="ghost" size="icon">
-                <Menu className="w-5 h-5" />
-              </Button>
-            </Link>
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center">
-                <Sparkles className="w-4 h-4 text-white" />
-              </div>
-              <div>
-                <h1 className="font-semibold">Aira</h1>
-                <p className="text-xs text-muted-foreground">{currentChatTitle || "Always here for you"}</p>
-              </div>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <Link href="/support">
-              <Button
-                variant="ghost"
-                size="sm"
-                title="Support Resources"
-                className="text-primary hover:text-primary"
-              >
-                <LifeBuoy className="w-4 h-4" />
-              </Button>
-            </Link>
-
-            <Button
-              variant="ghost"
-              size="sm"
               onClick={handleSaveChat}
               disabled={isSaving || messages.length <= 1}
               title="Save this conversation"
+              className="h-10 w-10 hidden md:inline-flex"
             >
-              <Save className="w-4 h-4 mr-1" />
-              <span className="hidden sm:inline">Save</span>
+              <Save className="w-5 h-5" />
             </Button>
 
             <Button
               variant="ghost"
-              size="sm"
+              size="icon"
               onClick={handleClearChat}
               title="Clear chat"
-              className="text-destructive hover:text-destructive"
+              className="h-10 w-10 hidden md:inline-flex text-destructive hover:text-destructive"
             >
-              <Trash2 className="w-4 h-4" />
+              <Trash2 className="w-5 h-5" />
             </Button>
-            <span className="text-sm text-muted-foreground hidden sm:inline">{user?.name}</span>
-            <Button variant="ghost" size="sm" onClick={logout}>
-              Logout
+
+            {/* Mobile Menu Toggle */}
+            <div className="relative md:hidden mobile-menu-container">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                className="h-10 w-10"
+              >
+                <MoreVertical className="w-5 h-5" />
+              </Button>
+
+              {/* Mobile Dropdown */}
+              {mobileMenuOpen && (
+                <div className="absolute right-0 top-12 bg-background border border-border rounded-lg shadow-lg py-2 min-w-[180px] z-20">
+                  <Link href="/support" onClick={() => setMobileMenuOpen(false)}>
+                    <button className="w-full px-4 py-2 text-left hover:bg-muted flex items-center gap-2">
+                      <LifeBuoy className="w-4 h-4" />
+                      <span className="text-sm">Support</span>
+                    </button>
+                  </Link>
+                  <button
+                    onClick={() => {
+                      handleSaveChat()
+                      setMobileMenuOpen(false)
+                    }}
+                    disabled={isSaving || messages.length <= 1}
+                    className="w-full px-4 py-2 text-left hover:bg-muted flex items-center gap-2 disabled:opacity-50"
+                  >
+                    <Save className="w-4 h-4" />
+                    <span className="text-sm">Save Chat</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      handleClearChat()
+                      setMobileMenuOpen(false)
+                    }}
+                    className="w-full px-4 py-2 text-left hover:bg-muted flex items-center gap-2 text-destructive"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    <span className="text-sm">Clear Chat</span>
+                  </button>
+                </div>
+              )}
+            </div>
+
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={logout}
+              className="h-10 px-3"
+            >
+              <span className="text-sm">Logout</span>
             </Button>
           </div>
+        </div>
+
+        {/* Row 2: Tagline */}
+        <div className="text-center pb-2">
+          <p className="text-xs text-muted-foreground/70 truncate px-4">
+            {currentChatTitle || "Always here for you"}
+          </p>
+        </div>
+
+        {/* Row 3: Usage Indicator */}
+        <div className="px-4 pb-2">
+          <UsageIndicator refreshTrigger={usageRefreshTrigger} />
         </div>
       </header>
 
@@ -301,12 +516,13 @@ export function ChatInterface() {
         </div>
       </div>
 
-      {/* Emotion Ring */}
-      <EmotionRing emotion={currentEmotion} />
+
 
       {/* Input Area */}
       <div className="border-t border-border/50 backdrop-blur-sm bg-background/80 sticky bottom-0">
         <div className="container mx-auto px-4 py-4 max-w-4xl">
+
+
           <form onSubmit={handleSubmit} className="flex gap-2">
             <Textarea
               value={input}
@@ -320,15 +536,45 @@ export function ChatInterface() {
                 }
               }}
             />
-            <Button type="submit" size="icon" className="h-[60px] w-[60px]" disabled={isLoading || !input.trim()}>
+
+            {/* Voice Mode Button */}
+            <Button
+              type="button"
+              size="icon"
+              variant="outline"
+              className="h-[60px] w-[60px] bg-gradient-to-br from-primary/10 to-accent/10 hover:from-primary/20 hover:to-accent/20 border-primary/30"
+              onClick={() => {
+                trackVoiceModeStarted()
+                setVoiceModeOpen(true)
+              }}
+            >
+              <Mic className="w-5 h-5 text-primary" />
+            </Button>
+
+            {/* Send Button */}
+            <Button
+              type="submit"
+              size="icon"
+              className="h-[60px] w-[60px]"
+              disabled={isLoading || !input.trim()}
+            >
               <Send className="w-5 h-5" />
             </Button>
           </form>
+
           <p className="text-xs text-muted-foreground text-center mt-2">
             Press Enter to send, Shift+Enter for new line
           </p>
         </div>
       </div>
+
+      {/* Voice Mode Overlay */}
+      <VoiceModeOverlay
+        isOpen={voiceModeOpen}
+        onClose={() => setVoiceModeOpen(false)}
+        onTranscriptComplete={handleVoiceTranscript}
+        onSendMessage={handleVoiceSendMessage}
+      />
     </div>
   )
 }

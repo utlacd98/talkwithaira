@@ -4,7 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server"
-import { supabase } from "@/lib/supabase"
+import { getSupabase } from "@/lib/supabase"
 
 export async function POST(req: NextRequest) {
   try {
@@ -20,6 +20,7 @@ export async function POST(req: NextRequest) {
     console.log("[Supabase Login] Attempting login for:", email)
 
     // Sign in with Supabase Auth
+    const supabase = getSupabase()
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,

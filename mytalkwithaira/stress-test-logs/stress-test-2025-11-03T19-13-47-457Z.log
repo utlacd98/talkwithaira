@@ -1,0 +1,71 @@
+[2025-11-03T19:13:47.463Z] [INFO] ================================================================================
+[2025-11-03T19:13:47.467Z] [INFO] STARTING STRESS TEST
+[2025-11-03T19:13:47.467Z] [INFO] ================================================================================
+[2025-11-03T19:13:47.468Z] [INFO] Target: https://v0-aira-web-app.vercel.app
+[2025-11-03T19:13:47.468Z] [INFO] Concurrent Users: 5
+[2025-11-03T19:13:47.470Z] [INFO] Duration: 10 seconds
+[2025-11-03T19:13:47.470Z] [INFO] Log File: C:\Users\User\mytalkwithaira\stress-test-logs\stress-test-2025-11-03T19-13-47-457Z.log
+[2025-11-03T19:13:47.471Z] [INFO] ================================================================================
+[2025-11-03T19:13:47.471Z] [INFO] 
+[2025-11-03T19:13:47.803Z] [REQUEST] User 1: 200 - 330ms
+[2025-11-03T19:13:47.822Z] [REQUEST] User 4: 200 - 178ms
+[2025-11-03T19:13:47.824Z] [REQUEST] User 5: 200 - 179ms
+[2025-11-03T19:13:47.835Z] [REQUEST] User 3: 200 - 194ms
+[2025-11-03T19:13:47.959Z] [REQUEST] User 2: 200 - 319ms
+[2025-11-03T19:13:48.999Z] [REQUEST] User 3: 200 - 41ms
+[2025-11-03T19:13:49.307Z] [REQUEST] User 2: 200 - 41ms
+[2025-11-03T19:13:49.800Z] [REQUEST] User 1: 200 - 34ms
+[2025-11-03T19:13:50.428Z] [REQUEST] User 4: 200 - 36ms
+[2025-11-03T19:13:50.471Z] [REQUEST] User 5: 200 - 67ms
+[2025-11-03T19:13:51.467Z] [REQUEST] User 4: 200 - 37ms
+[2025-11-03T19:13:52.028Z] [REQUEST] User 3: 200 - 33ms
+[2025-11-03T19:13:52.265Z] [REQUEST] User 2: 200 - 31ms
+[2025-11-03T19:13:52.478Z] [PROGRESS] Progress: 5s | Requests: 13 | Success: 100.00% | Avg Response: 116.92ms
+[2025-11-03T19:13:52.498Z] [REQUEST] User 1: 200 - 36ms
+[2025-11-03T19:13:53.450Z] [REQUEST] User 5: 200 - 61ms
+[2025-11-03T19:13:53.690Z] [REQUEST] User 1: 200 - 38ms
+[2025-11-03T19:13:54.031Z] [REQUEST] User 4: 200 - 63ms
+[2025-11-03T19:13:54.047Z] [REQUEST] User 2: 200 - 45ms
+[2025-11-03T19:13:54.253Z] [REQUEST] User 3: 200 - 39ms
+[2025-11-03T19:13:54.971Z] [REQUEST] User 4: 200 - 52ms
+[2025-11-03T19:13:55.412Z] [REQUEST] User 2: 200 - 62ms
+[2025-11-03T19:13:55.497Z] [REQUEST] User 3: 200 - 56ms
+[2025-11-03T19:13:55.756Z] [REQUEST] User 4: 200 - 39ms
+[2025-11-03T19:13:55.783Z] [REQUEST] User 5: 200 - 32ms
+[2025-11-03T19:13:56.433Z] [REQUEST] User 4: 200 - 59ms
+[2025-11-03T19:13:56.569Z] [REQUEST] User 3: 200 - 32ms
+[2025-11-03T19:13:56.705Z] [REQUEST] User 1: 200 - 37ms
+[2025-11-03T19:13:57.491Z] [PROGRESS] Progress: 10s | Requests: 27 | Success: 100.00% | Avg Response: 80.41ms
+[2025-11-03T19:13:57.514Z] [REQUEST] User 2: 200 - 39ms
+[2025-11-03T19:13:57.515Z] [USER] User 1 completed 5 requests
+[2025-11-03T19:13:57.868Z] [USER] User 5 completed 4 requests
+[2025-11-03T19:13:58.170Z] [USER] User 2 completed 6 requests
+[2025-11-03T19:13:58.488Z] [USER] User 4 completed 7 requests
+[2025-11-03T19:13:59.256Z] [USER] User 3 completed 6 requests
+[2025-11-03T19:13:59.260Z] [INFO] 
+[2025-11-03T19:13:59.268Z] [INFO] Test completed!
+[2025-11-03T19:13:59.291Z] [INFO] 
+[2025-11-03T19:13:59.297Z] [STATS] 
+[2025-11-03T19:13:59.300Z] [STATS] ================================================================================
+[2025-11-03T19:13:59.300Z] [STATS] STRESS TEST RESULTS
+[2025-11-03T19:13:59.302Z] [STATS] ================================================================================
+[2025-11-03T19:13:59.307Z] [STATS] Target URL: https://v0-aira-web-app.vercel.app
+[2025-11-03T19:13:59.308Z] [STATS] Concurrent Users: 5
+[2025-11-03T19:13:59.309Z] [STATS] Test Duration: 11.79s
+[2025-11-03T19:13:59.310Z] [STATS] 
+[2025-11-03T19:13:59.310Z] [STATS] REQUEST STATISTICS:
+[2025-11-03T19:13:59.311Z] [STATS]   Total Requests: 28
+[2025-11-03T19:13:59.311Z] [STATS]   Successful: 28 (100.00%)
+[2025-11-03T19:13:59.312Z] [STATS]   Failed: 0
+[2025-11-03T19:13:59.312Z] [STATS]   Requests/Second: 2.38
+[2025-11-03T19:13:59.313Z] [STATS] 
+[2025-11-03T19:13:59.313Z] [STATS] RESPONSE TIME:
+[2025-11-03T19:13:59.313Z] [STATS]   Average: 78.93ms
+[2025-11-03T19:13:59.313Z] [STATS]   Min: 31ms
+[2025-11-03T19:13:59.313Z] [STATS]   Max: 330ms
+[2025-11-03T19:13:59.313Z] [STATS] 
+[2025-11-03T19:13:59.314Z] [STATS] STATUS CODES:
+[2025-11-03T19:13:59.314Z] [STATS]   200: 28 (100.00%)
+[2025-11-03T19:13:59.315Z] [STATS] ================================================================================
+[2025-11-03T19:13:59.315Z] [STATS] Log file: C:\Users\User\mytalkwithaira\stress-test-logs\stress-test-2025-11-03T19-13-47-457Z.log
+[2025-11-03T19:13:59.315Z] [STATS] ================================================================================

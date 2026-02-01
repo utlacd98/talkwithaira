@@ -4,11 +4,11 @@
  */
 
 import { NextRequest, NextResponse } from "next/server"
-import { supabase } from "@/lib/supabase"
+import { getSupabase } from "@/lib/supabase"
 
 export async function POST(req: NextRequest) {
   try {
-    const { email, password, name } = await req.json()
+    const { email, password, name, plan = "free" } = await req.json()
 
     if (!email || !password || !name) {
       return NextResponse.json(
@@ -24,16 +24,17 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    console.log("[Supabase Signup] Attempting signup for:", email)
+    console.log("[Supabase Signup] Attempting signup for:", email, "with plan:", plan)
 
     // Sign up with Supabase Auth
+    const supabase = getSupabase()
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
         data: {
           name,
-          plan: "free",
+          plan,
           role: "user",
         },
         emailRedirectTo: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/auth/callback`,
@@ -72,6 +73,24 @@ export async function POST(req: NextRequest) {
 
     console.log("[Supabase Signup] Signup successful for:", email)
 
+    // Register user in Redis with the specified plan
+    try {
+      await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/auth/register-oauth-user`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: data.user.id,
+          email: data.user.email,
+          name: data.user.user_metadata?.name || name,
+          plan,
+        }),
+      })
+      console.log("[Supabase Signup] User registered in Redis with plan:", plan)
+    } catch (redisError) {
+      console.error("[Supabase Signup] Failed to register in Redis (non-critical):", redisError)
+      // Don't fail signup if Redis registration fails
+    }
+
     // Check if email confirmation is required
     if (data.user && !data.session) {
       console.log("[Supabase Signup] Email confirmation required for:", email)
@@ -83,7 +102,7 @@ export async function POST(req: NextRequest) {
           id: data.user.id,
           email: data.user.email,
           name: data.user.user_metadata?.name || name,
-          plan: "free",
+          plan,
           role: "user",
         },
       })
@@ -96,7 +115,7 @@ export async function POST(req: NextRequest) {
         id: data.user.id,
         email: data.user.email,
         name: data.user.user_metadata?.name || name,
-        plan: "free",
+        plan,
         role: "user",
       },
       session: {

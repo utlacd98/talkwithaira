@@ -10,29 +10,33 @@ let _stripe: Stripe | null = null
 
 export function getStripe(): Stripe {
   if (!_stripe) {
-    const stripeSecretKey = process.env.STRIPE_SECRET_KEY
-    
+    const stripeSecretKey = process.env.STRIPE_SECRET_KEY?.trim()
+
     if (!stripeSecretKey) {
       throw new Error("Missing STRIPE_SECRET_KEY environment variable")
     }
-    
+
+    console.log("[Stripe] Initializing with key prefix:", stripeSecretKey.substring(0, 20))
+    console.log("[Stripe] Key length:", stripeSecretKey.length)
+
     _stripe = new Stripe(stripeSecretKey, {
-      apiVersion: "2024-11-20.acacia",
+      apiVersion: "2024-06-20",
       typescript: true,
     })
   }
-  
+
   return _stripe
 }
 
-// Pricing configuration for £8.99/month Premium plan
+// Pricing configuration for £2.99/month Premium subscription
 export const STRIPE_PRICES = {
   premium: {
     name: "Premium",
-    priceId: process.env.NEXT_PUBLIC_STRIPE_PRICE_PREMIUM,
-    amount: 899, // £8.99 in pence
+    priceId: process.env.NEXT_PUBLIC_STRIPE_PRICE_PREMIUM || "price_1SZdjcFbb6V4jtxGeyAyqLoU",
+    amount: 299, // £2.99 in pence
     currency: "gbp",
     interval: "month",
+    description: "Unlimited chats with Aira",
   },
 }
 
@@ -40,7 +44,8 @@ export const STRIPE_PRICES = {
  * Get Stripe Price ID for a plan
  */
 export function getPriceId(plan: "premium"): string | null {
-  return STRIPE_PRICES[plan].priceId || null
+  const priceId = STRIPE_PRICES[plan].priceId
+  return priceId ? priceId.trim() : null
 }
 
 /**

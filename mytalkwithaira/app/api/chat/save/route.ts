@@ -9,7 +9,7 @@ import {
 } from "@/lib/vercel-kv"
 import { incrementConversations, addRecentConversation } from "@/lib/redis"
 import { isMockMode, generateMockSaveResponse, simulateNetworkDelay, getOrCreateMockSession } from "@/lib/mock-services"
-import { supabaseServer, supabase } from "@/lib/supabase"
+import { getSupabaseServer, getSupabase } from "@/lib/supabase"
 
 interface SaveChatRequest {
   title?: string
@@ -136,6 +136,7 @@ export async function POST(req: NextRequest) {
 
     // Also save to Supabase for persistent storage across deployments
     // Only attempt Supabase save for authenticated users with service role key
+    const supabaseServer = getSupabaseServer()
     if (userId && userId !== "anonymous" && supabaseServer) {
       try {
         console.log("[Save Chat API] Attempting to save to Supabase for authenticated user:", userId)
@@ -291,7 +292,7 @@ export async function GET(req: NextRequest) {
       // If not found in KV or fallback, try Supabase
       if (!chat) {
         try {
-          const supabaseClient = supabaseServer || supabase
+          const supabaseClient = getSupabaseServer() || getSupabase()
           console.log("[Get Chat API] Checking Supabase for chat:", chatId)
 
           // Get conversation from Supabase
@@ -378,7 +379,7 @@ export async function GET(req: NextRequest) {
 
       // Try Supabase next
       try {
-        const supabaseClient = supabaseServer || supabase
+        const supabaseClient = getSupabaseServer() || getSupabase()
         const { data: conversations, error } = await supabaseClient
           .from("conversations")
           .select("id, title, message_count, tags, created_at, updated_at")
@@ -439,7 +440,7 @@ export async function DELETE(req: NextRequest) {
 
     // Also delete from Supabase
     try {
-      const supabaseClient = supabaseServer || supabase
+      const supabaseClient = getSupabaseServer() || getSupabase()
       // Delete messages first (due to foreign key constraint)
       const { error: msgError } = await supabaseClient
         .from("messages")
