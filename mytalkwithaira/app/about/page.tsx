@@ -96,7 +96,7 @@ export default function AboutPage() {
                 <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center mb-4">
                   <value.icon className="w-6 h-6 text-primary" />
                 </div>
-                <h3 className="text-2xl font-semibold mb-3">{value.title}</h3>
+                <p className="text-2xl font-semibold mb-3">{value.title}</p>
                 <p className="text-muted-foreground leading-relaxed">{value.description}</p>
               </Card>
             ))}
@@ -132,6 +132,28 @@ export default function AboutPage() {
                   find moments of clarity in their daily lives.
                 </p>
               </div>
+            </Card>
+          </div>
+        </div>
+      </section>
+
+      {/* Founder Section */}
+      <section className="py-24">
+        <div className="container mx-auto px-4">
+          <div className="max-w-4xl mx-auto">
+            <Card className="glass-card p-8 md:p-12">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center">
+                  <Heart className="w-6 h-6 text-white" />
+                </div>
+                <h2 className="text-3xl font-bold font-heading">Meet the Founder</h2>
+              </div>
+              <p className="text-lg text-muted-foreground leading-relaxed mb-4">
+                <strong>Andrew Barrett</strong> is the visionary founder of Aira, dedicated to making empathetic AI accessible to everyone. With a passion for mental wellness and human-centered technology, Andrew created Aira to bridge the gap between those seeking support and the tools available to them.
+              </p>
+              <p className="text-lg text-muted-foreground leading-relaxed">
+                Andrew's mission is simple: build technology that truly listens, understands, and supports people on their journey of self-discovery and personal growth.
+              </p>
             </Card>
           </div>
         </div>
